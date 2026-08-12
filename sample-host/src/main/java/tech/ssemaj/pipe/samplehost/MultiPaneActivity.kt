@@ -2,6 +2,7 @@ package tech.ssemaj.pipe.samplehost
 
 import android.app.Activity
 import android.os.Bundle
+import android.view.View
 import android.widget.TextView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +26,14 @@ class MultiPaneActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_multi_pane)
+        val root = findViewById<View>(R.id.multi_pane_root)
+        val base = (16 * resources.displayMetrics.density).toInt()
+        root.setOnApplyWindowInsetsListener { v, insets ->
+            val bars = insets.getInsets(android.view.WindowInsets.Type.systemBars())
+            v.setPadding(base + bars.left, base + bars.top, base + bars.right, base + bars.bottom)
+            insets
+        }
+        root.requestApplyInsets()
         val provider = ProviderComponent(
             packageName = "tech.ssemaj.pipe.sampleprovider",
             serviceClass = "tech.ssemaj.pipe.sampleprovider.DemoPaneService",

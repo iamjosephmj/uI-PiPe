@@ -27,20 +27,28 @@ object PipeFullScreen {
         onError: (PipeException) -> Unit = {},
     ): Job {
         val root = activity.findViewById<ViewGroup>(android.R.id.content)
+        // The inset padding is applied to a wrapper CONTAINER, not to pipeView itself: padding a
+        // view doesn't change its own measured size (or fire onSizeChanged), so PipeView would
+        // report the full unpadded screen to the provider while the real surface underneath is
+        // smaller by the insets. Shrinking the container instead shrinks pipeView (its
+        // MATCH_PARENT child), so PipeView's own bounds — and the size it reports — stay correct.
+        val container = FrameLayout(activity)
         val pipeView = PipeView(activity)
-        pipeView.setOnApplyWindowInsetsListener { v, insets ->
+        container.setOnApplyWindowInsetsListener { v, insets ->
             val bars = insets.getInsets(android.view.WindowInsets.Type.systemBars())
             v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
             insets
         }
-        root.addView(pipeView, FrameLayout.LayoutParams(
+        root.addView(container, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        pipeView.requestApplyInsets()
+        container.addView(pipeView, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        container.requestApplyInsets()
 
         val backCallback = object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 pipeView.close()
-                remove(root, pipeView, this)
+                remove(root, container, this)
             }
         }
         activity.onBackPressedDispatcher.addCallback(activity, backCallback)
@@ -50,13 +58,13 @@ object PipeFullScreen {
             provider = provider,
             request = request.forcePresentation(PipePresentation.FULL_SCREEN),
             authorizer = authorizer,
-            onError = { e -> remove(root, pipeView, backCallback); onError(e) },
+            onError = { e -> remove(root, container, backCallback); onError(e) },
             onSession = { session ->
                 // The session can end other ways than back-press (host-initiated close, provider
                 // close, peer death) — tear the container down then too, so it never leaks.
                 activity.lifecycleScope.launch {
                     session.state.collect { s ->
-                        if (s is PipeState.Closed) remove(root, pipeView, backCallback)
+                        if (s is PipeState.Closed) remove(root, container, backCallback)
                     }
                 }
                 onSession(session)
@@ -65,10 +73,10 @@ object PipeFullScreen {
     }
 
     /** Idempotent: back-press and the session-state observer can both fire for the same close. */
-    private fun remove(root: ViewGroup, view: PipeView, cb: OnBackPressedCallback) {
+    private fun remove(root: ViewGroup, container: FrameLayout, cb: OnBackPressedCallback) {
         if (!cb.isEnabled) return
         cb.isEnabled = false
         cb.remove()
-        (view.parent as? ViewGroup)?.removeView(view)
+        (container.parent as? ViewGroup)?.removeView(container)
     }
 }
