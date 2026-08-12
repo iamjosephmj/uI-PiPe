@@ -31,5 +31,7 @@ class RequestCertificationUseCase(
         }
     }
 
-    companion object { const val RESPONSE_TIMEOUT_MS = 15_000L }
+    // The wait spans a human reading the consent prompt in the pane and tapping Approve, so it
+    // must be generous — 15s regularly expired before a person (or a second pane) could respond.
+    companion object { const val RESPONSE_TIMEOUT_MS = 60_000L }
 }

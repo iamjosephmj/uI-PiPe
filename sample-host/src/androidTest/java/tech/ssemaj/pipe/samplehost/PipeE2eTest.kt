@@ -13,12 +13,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 private const val TIMEOUT = 10_000L
+private const val CRYPTO_TIMEOUT = 20_000L // key attestation generation can be slow
 
 /**
- * Requires BOTH apps installed:
- *   ./gradlew :sample-host:installDebug :sample-provider:installDebug
- * The embedded pane is a real window of the provider process, so UiAutomator
- * (which sees all windows) is used instead of Espresso for pane-side assertions.
+ * Requires BOTH apps installed. The embedded pane is a real window of the provider
+ * process, so UiAutomator is used for pane-side assertions.
  */
 @RunWith(AndroidJUnit4::class)
 class PipeE2eTest {
@@ -26,38 +25,37 @@ class PipeE2eTest {
 
     @Before fun launch() {
         ActivityScenario.launch(MainActivity::class.java)
-        // Pane rendered ⇒ open handshake + SurfacePackage attach worked.
         assertTrue("pane did not render", device.wait(Until.hasObject(By.text("pane-ready")), TIMEOUT))
     }
 
-    @Test fun paneRendersAndHostReportsOpened() {
-        assertNotNull(device.findObject(By.text("opened")))
+    @Test fun paneRendersAndHostReportsConnected() {
+        assertNotNull(device.wait(Until.findObject(By.text("Connected")), TIMEOUT))
     }
 
-    @Test fun touchInPaneReachesProvider_andChannelProviderToHost() {
-        device.findObject(By.text("Ping Host")).click() // touch crosses into provider window
-        assertTrue("host never got provider message",
-            device.wait(Until.hasObject(By.textStartsWith("msg:")), TIMEOUT))
+    @Test fun certificationRoundTrip_touchAndBothChannels() {
+        device.findObject(By.text("Request certification")).click()
+        // Host→provider typed message arrived: consent UI appears in the pane.
+        assertTrue("consent never appeared in pane",
+            device.wait(Until.hasObject(By.text("Approve")), TIMEOUT))
+        device.findObject(By.text("Approve")).click() // touch crosses into the provider window
+        // Provider→host: granted response arrives, host verifies.
+        assertTrue("host never showed a verification badge",
+            device.wait(Until.hasObject(By.textContains("-verified")), CRYPTO_TIMEOUT) ||
+                device.hasObject(By.text("Software-backed")))
+        assertTrue("pane never confirmed issuance",
+            device.wait(Until.hasObject(By.text("Certification issued")), TIMEOUT))
     }
 
-    @Test fun imeTextEntryWorksInsidePane() {
-        val edit = device.findObject(By.clazz("android.widget.EditText"))
-        edit.click()
-        edit.text = "typed-in-pane"
-        device.findObject(By.text("Ping Host")).click()
-        assertTrue("typed text did not round-trip to host",
-            device.wait(Until.hasObject(By.text("msg: typed-in-pane")), TIMEOUT))
-    }
-
-    @Test fun channelHostToProvider() {
-        device.findObject(By.text("Send To Pane")).click()
-        assertTrue("pane never showed host message",
-            device.wait(Until.hasObject(By.text("hello-from-host")), TIMEOUT))
+    @Test fun declineFlowReachesHost() {
+        device.findObject(By.text("Request certification")).click()
+        assertTrue(device.wait(Until.hasObject(By.text("Decline")), TIMEOUT))
+        device.findObject(By.text("Decline")).click()
+        assertTrue("host never showed decline",
+            device.wait(Until.hasObject(By.textStartsWith("Provider declined:")), TIMEOUT))
     }
 
     @Test fun closingHostActivityTearsDownPane() {
         device.pressHome()
-        // Pane window must be gone once the host UI is gone.
         assertTrue("pane still visible after host gone",
             device.wait(Until.gone(By.text("pane-ready")), TIMEOUT))
     }
