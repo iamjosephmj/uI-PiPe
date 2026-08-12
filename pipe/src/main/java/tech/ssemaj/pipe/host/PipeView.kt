@@ -139,14 +139,14 @@ class PipeView @JvmOverloads constructor(
         authorizer: PipeAuthorizer = PipeAuthorizers.sameSigningKey(context),
         timeout: Duration = 10.seconds,
     ): PipeSession = withContext(dispatcher) {
-        if (request.presentation != PipePresentation.EMBEDDED) {
-            directInput = true
-            surfaceView.setZOrderOnTop(true)
-        }
         check(current == null) { "PipeView already has a live session; call close() first" }
         val deferred = CompletableDeferred<PipeSession>()
         val attempt = OpenAttempt(provider, request, deferred)
         current = attempt
+        if (request.presentation != PipePresentation.EMBEDDED) {
+            directInput = true
+            surfaceView.setZOrderOnTop(true)
+        }
         try {
             withTimeout(timeout) {
                 val gate = HostGate(IdentityResolver(AndroidSigningSource(context)), authorizer)
