@@ -44,13 +44,14 @@ object PipeDiscovery {
             val pm = context.applicationContext.packageManager
             val signingSource = AndroidSigningSource(context)
             val raw = pm.queryIntentServices(Intent(action), PackageManager.ResolveInfoFlags.of(0))
-                .map { resolveInfo ->
-                    val serviceInfo = resolveInfo.serviceInfo
-                    ResolvedService(
-                        packageName = serviceInfo.packageName,
-                        serviceClass = serviceInfo.name,
-                        label = resolveInfo.loadLabel(pm),
-                    )
+                .mapNotNull { resolveInfo ->
+                    resolveInfo.serviceInfo?.let { serviceInfo ->
+                        ResolvedService(
+                            packageName = serviceInfo.packageName,
+                            serviceClass = serviceInfo.name,
+                            label = resolveInfo.loadLabel(pm),
+                        )
+                    }
                 }
             buildDescriptors(raw) { signingSource.certLineageSha256(it) }
         }
