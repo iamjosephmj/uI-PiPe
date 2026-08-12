@@ -12,7 +12,8 @@ class HostGate(
     private val authorizer: EmbedAuthorizer,
 ) {
     fun admit(component: ProviderComponent, request: PipeRequest): GateResult {
-        val peer = resolver.forPackage(component.packageName)
+        val uid = resolver.uidForPackage(component.packageName)
+        val peer = resolver.forPackage(component.packageName, uid)
             ?: return GateResult.Failed("provider signing certs unreadable (not installed?)")
         return when (val d = authorizer.authorize(peer, request)) {
             is AuthDecision.Allow -> GateResult.Admitted(peer)

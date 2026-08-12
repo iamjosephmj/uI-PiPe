@@ -80,7 +80,7 @@ abstract class PipeProviderService : Service() {
         val scvh = SurfaceControlViewHost(this, display, spec.inputTransferToken)
         scvh.setView(content.view, spec.widthPx, spec.heightPx)
 
-        val pane = ActivePane(scvh, content, hostChannel, mainHandler)
+        val pane = ActivePane(scvh, content, hostChannel, mainHandler, peer.uid)
         try {
             // Host death → tear down our side.
             hostChannel.asBinder().linkToDeath({ mainHandler.post { pane.close(CloseReason.PEER_DIED) } }, 0)
@@ -103,23 +103,33 @@ abstract class PipeProviderService : Service() {
         private val content: PipeContent,
         private val hostChannel: IHostChannel,
         private val handler: Handler,
+        /** Kernel-derived uid of the admitted host; -1 (unresolvable) skips the check. */
+        private val hostUid: Int,
     ) {
         private val inbound = InboundSequencer()
         private var closed = false
 
+        private fun callerUidMismatch(): Boolean =
+            hostUid != -1 && Binder.getCallingUid() != hostUid
+
         val session = object : IEmbedSession.Stub() {
             override fun resize(widthPx: Int, heightPx: Int) {
+                if (callerUidMismatch()) return
                 handler.post {
                     if (closed) return@post
                     scvh.relayout(widthPx, heightPx)
                     content.onResized(widthPx, heightPx)
                 }
             }
-            override fun close() { handler.post { close(CloseReason.HOST_CLOSED) } }
+            override fun close() {
+                if (callerUidMismatch()) return
+                handler.post { close(CloseReason.HOST_CLOSED) }
+            }
         }
 
         val guestChannel = object : IGuestChannel.Stub() {
             override fun send(message: PipeMessage) {
+                if (callerUidMismatch()) return
                 val accepted = inbound.accept(message) ?: return
                 handler.post { if (!closed) content.onMessage(accepted) }
             }

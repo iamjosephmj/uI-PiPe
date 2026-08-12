@@ -12,9 +12,11 @@ import tech.ssemaj.pipe.provider.GateResult
 
 private class FakeSource(
     private val certs: Map<String, List<String>> = mapOf("com.provider" to listOf("aa11")),
+    private val uids: Map<String, Int> = mapOf("com.provider" to 10123),
 ) : SigningSource {
     override fun packagesForUid(uid: Int) = emptyList<String>()
     override fun certLineageSha256(packageName: String) = certs[packageName] ?: emptyList()
+    override fun uidForPackage(packageName: String) = uids[packageName] ?: -1
 }
 
 private val component = ProviderComponent("com.provider", "com.provider.PaneService")
@@ -36,5 +38,19 @@ class HostGateTest {
     @Test fun failsWhenProviderCertsUnreadable() {
         val gate = HostGate(IdentityResolver(FakeSource(certs = emptyMap())), EmbedAuthorizer { _, _ -> AuthDecision.Allow })
         assertTrue(gate.admit(component, request) is GateResult.Failed)
+    }
+
+    @Test fun admittedPeerCarriesResolvedUid() {
+        val gate = HostGate(IdentityResolver(FakeSource()), EmbedAuthorizer { _, _ -> AuthDecision.Allow })
+        val result = gate.admit(component, request)
+        assertTrue(result is GateResult.Admitted)
+        assertEquals(10123, (result as GateResult.Admitted).peer.uid)
+    }
+
+    @Test fun admittedPeerUidIsMinusOneWhenUnresolvable() {
+        val gate = HostGate(IdentityResolver(FakeSource(uids = emptyMap())), EmbedAuthorizer { _, _ -> AuthDecision.Allow })
+        val result = gate.admit(component, request)
+        assertTrue(result is GateResult.Admitted)
+        assertEquals(-1, (result as GateResult.Admitted).peer.uid)
     }
 }

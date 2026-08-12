@@ -14,6 +14,9 @@ class AndroidSigningSource(context: Context) : SigningSource {
     override fun packagesForUid(uid: Int): List<String> =
         try { pm.getPackagesForUid(uid)?.toList().orEmpty() } catch (_: Exception) { emptyList() }
 
+    override fun uidForPackage(packageName: String): Int =
+        try { pm.getPackageUid(packageName, PackageManager.PackageInfoFlags.of(0)) } catch (_: Exception) { -1 }
+
     override fun certLineageSha256(packageName: String): List<String> = try {
         val info = pm.getPackageInfo(
             packageName,

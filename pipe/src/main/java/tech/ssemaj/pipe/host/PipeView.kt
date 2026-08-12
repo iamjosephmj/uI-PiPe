@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.os.Binder
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -167,7 +168,7 @@ class PipeView @JvmOverloads constructor(
             bound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
             if (!bound) {
                 runCatching { context.unbindService(connection) }
-                mainHandler.post {
+                terminate {
                     callbacks.onError(PipeError(PipeError.Code.PROVIDER_NOT_FOUND, "bindService returned false"))
                 }
             }
@@ -194,17 +195,28 @@ class PipeView @JvmOverloads constructor(
                 )
                 remote.open(spec, hostChannelStub, openCallbackStub)
             } catch (t: Throwable) {
-                callbacks.onError(PipeError(PipeError.Code.TRANSPORT_FAILURE, "open() failed: ${t.message}"))
-                close(CloseReason.PEER_DIED, notifyProvider = false)
+                terminate {
+                    callbacks.onError(PipeError(PipeError.Code.TRANSPORT_FAILURE, "open() failed: ${t.message}"))
+                }
             }
+        }
+
+        /** Uid captured at gate time; -1 means unresolvable, so the check is skipped. */
+        private val expectedUid: Int get() = verifiedPeer?.uid ?: -1
+
+        private fun callerUidMismatch(): Boolean {
+            val expected = expectedUid
+            return expected != -1 && Binder.getCallingUid() != expected
         }
 
         private val hostChannelStub = object : IHostChannel.Stub() {
             override fun send(message: PipeMessage) {
+                if (callerUidMismatch()) return
                 val accepted = inbound.accept(message) ?: return
                 mainHandler.post { if (!closed) callbacks.onMessage(accepted) }
             }
             override fun onClosed(closeReasonWire: Int) {
+                if (callerUidMismatch()) return
                 mainHandler.post { close(CloseReason.fromWire(closeReasonWire), notifyProvider = false) }
             }
         }
@@ -228,20 +240,30 @@ class PipeView @JvmOverloads constructor(
                     terminate { callbacks.onError(PipeError(PipeError.Code.TRANSPORT_FAILURE, message)) }
                 }
             }
+        }
 
-            /**
-             * Tear down a never-opened attempt (denied or errored before onOpened) without
-             * firing onClosed: nothing was ever opened, so there is nothing to "close", and a
-             * trailing onClosed would immediately clobber the terminal callback's UI state.
-             */
-            private fun terminate(deliver: () -> Unit) {
-                if (closed) return
-                closed = true
-                if (bound) runCatching { context.unbindService(connection) }
-                bound = false
-                if (current === this@OpenAttempt) { current = null; embeddedInputToken = null }
-                deliver()
+        /**
+         * Tear down a never-opened attempt (denied or errored before onOpened, bindService()
+         * returning false, or a local failure while sending open()) without firing onClosed:
+         * nothing was ever opened, so there is nothing to "close", and a trailing onClosed would
+         * immediately clobber the terminal callback's UI state.
+         *
+         * If the provider actually opened a live surface before failing (called onOpened, then
+         * onDenied/onError — a protocol violation), there IS something to close: route through
+         * the real close path instead so the surface/session/channel are released and exactly
+         * one terminal callback (onClosed) fires.
+         */
+        private fun terminate(deliver: () -> Unit) {
+            if (closed) return
+            if (remoteSession != null) {
+                close(CloseReason.PROVIDER_CLOSED, notifyProvider = false)
+                return
             }
+            closed = true
+            if (bound) runCatching { context.unbindService(connection) }
+            bound = false
+            if (current === this@OpenAttempt) { current = null; embeddedInputToken = null }
+            deliver()
         }
 
         fun close(reason: CloseReason, notifyProvider: Boolean) {

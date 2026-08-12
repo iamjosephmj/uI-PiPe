@@ -22,4 +22,7 @@ class IdentityResolver(private val source: SigningSource) {
         if (lineage.isEmpty()) return null
         return PeerIdentity(uid, listOf(packageName), lineage)
     }
+
+    /** Uid currently assigned to [packageName], or -1 if unresolvable. Never throws. */
+    fun uidForPackage(packageName: String): Int = source.uidForPackage(packageName)
 }
