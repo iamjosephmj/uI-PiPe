@@ -287,6 +287,29 @@ public final class tech/ssemaj/pipe/core/PipeVersionMismatchException : tech/sse
 	public final fun getProviderVersion ()I
 }
 
+public final class tech/ssemaj/pipe/discovery/PipeDiscovery {
+	public static final field INSTANCE Ltech/ssemaj/pipe/discovery/PipeDiscovery;
+	public final fun query (Landroid/content/Context;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun query$default (Ltech/ssemaj/pipe/discovery/PipeDiscovery;Landroid/content/Context;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class tech/ssemaj/pipe/discovery/ProviderDescriptor {
+	public fun <init> (Ltech/ssemaj/pipe/host/ProviderComponent;Ljava/lang/String;Ljava/lang/CharSequence;Ljava/util/List;)V
+	public final fun component1 ()Ltech/ssemaj/pipe/host/ProviderComponent;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/CharSequence;
+	public final fun component4 ()Ljava/util/List;
+	public final fun copy (Ltech/ssemaj/pipe/host/ProviderComponent;Ljava/lang/String;Ljava/lang/CharSequence;Ljava/util/List;)Ltech/ssemaj/pipe/discovery/ProviderDescriptor;
+	public static synthetic fun copy$default (Ltech/ssemaj/pipe/discovery/ProviderDescriptor;Ltech/ssemaj/pipe/host/ProviderComponent;Ljava/lang/String;Ljava/lang/CharSequence;Ljava/util/List;ILjava/lang/Object;)Ltech/ssemaj/pipe/discovery/ProviderDescriptor;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCertSha256 ()Ljava/util/List;
+	public final fun getComponent ()Ltech/ssemaj/pipe/host/ProviderComponent;
+	public final fun getLabel ()Ljava/lang/CharSequence;
+	public final fun getPackageName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class tech/ssemaj/pipe/host/HostGate {
 	public fun <init> (Ltech/ssemaj/pipe/auth/IdentityResolver;Ltech/ssemaj/pipe/auth/PipeAuthorizer;)V
 	public final fun admit (Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
