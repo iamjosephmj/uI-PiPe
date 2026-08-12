@@ -1,5 +1,6 @@
 package tech.ssemaj.pipe.samplehost
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -43,6 +44,9 @@ class MainActivity : ComponentActivity() {
                     onReopen = viewModel::reopen,
                     onOpenFullScreen = { viewModel.openFullScreen(this@MainActivity) },
                     onOpenDialog = { viewModel.openDialog(this@MainActivity) },
+                    onOpenMultiPane = {
+                        startActivity(Intent(this@MainActivity, MultiPaneActivity::class.java))
+                    },
                 )
             }
         }

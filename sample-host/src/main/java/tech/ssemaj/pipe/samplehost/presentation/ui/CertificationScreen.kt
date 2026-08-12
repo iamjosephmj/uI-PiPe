@@ -47,6 +47,7 @@ fun CertificationScreen(
     onReopen: () -> Unit,
     onOpenFullScreen: () -> Unit = {},
     onOpenDialog: () -> Unit = {},
+    onOpenMultiPane: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -94,6 +95,10 @@ fun CertificationScreen(
                     modifier = Modifier.weight(1f),
                 ) { Text("Dialog") }
             }
+            OutlinedButton(
+                onClick = onOpenMultiPane,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("Multi-pane") }
             PhaseCard(state.phase)
         }
     }
