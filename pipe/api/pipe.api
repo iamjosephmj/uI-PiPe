@@ -108,6 +108,26 @@ public final class tech/ssemaj/pipe/core/CloseReason$Companion {
 	public final fun fromWire (I)Ltech/ssemaj/pipe/core/CloseReason;
 }
 
+public final class tech/ssemaj/pipe/core/DenialSource : java/lang/Enum {
+	public static final field HOST_POLICY Ltech/ssemaj/pipe/core/DenialSource;
+	public static final field PROVIDER_POLICY Ltech/ssemaj/pipe/core/DenialSource;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ltech/ssemaj/pipe/core/DenialSource;
+	public static fun values ()[Ltech/ssemaj/pipe/core/DenialSource;
+}
+
+public final class tech/ssemaj/pipe/core/Pipe {
+	public static final field ACTION_OPEN_PANE Ljava/lang/String;
+	public static final field INSTANCE Ltech/ssemaj/pipe/core/Pipe;
+	public static final field PERMISSION_BIND_PANE Ljava/lang/String;
+}
+
+public final class tech/ssemaj/pipe/core/PipeDeniedException : tech/ssemaj/pipe/core/PipeException {
+	public fun <init> (Ljava/lang/String;Ltech/ssemaj/pipe/core/DenialSource;)V
+	public final fun getReason ()Ljava/lang/String;
+	public final fun getSource ()Ltech/ssemaj/pipe/core/DenialSource;
+}
+
 public final class tech/ssemaj/pipe/core/PipeError {
 	public fun <init> (Ltech/ssemaj/pipe/core/PipeError$Code;Ljava/lang/String;)V
 	public final fun component1 ()Ltech/ssemaj/pipe/core/PipeError$Code;
@@ -132,6 +152,11 @@ public final class tech/ssemaj/pipe/core/PipeError$Code : java/lang/Enum {
 	public static fun values ()[Ltech/ssemaj/pipe/core/PipeError$Code;
 }
 
+public abstract class tech/ssemaj/pipe/core/PipeException : java/lang/Exception {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
 public final class tech/ssemaj/pipe/core/PipeMessage : android/os/Parcelable {
 	public static final field CREATOR Landroid/os/Parcelable$Creator;
 	public static final field Companion Ltech/ssemaj/pipe/core/PipeMessage$Companion;
@@ -140,14 +165,12 @@ public final class tech/ssemaj/pipe/core/PipeMessage : android/os/Parcelable {
 	public synthetic fun <init> (Landroid/os/Bundle;IJILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Landroid/os/Bundle;
 	public final fun component2 ()I
-	public final fun component3 ()J
 	public final fun copy (Landroid/os/Bundle;IJ)Ltech/ssemaj/pipe/core/PipeMessage;
 	public static synthetic fun copy$default (Ltech/ssemaj/pipe/core/PipeMessage;Landroid/os/Bundle;IJILjava/lang/Object;)Ltech/ssemaj/pipe/core/PipeMessage;
 	public final fun describeContents ()I
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getPayload ()Landroid/os/Bundle;
 	public final fun getSchemaVersion ()I
-	public final fun getSeq ()J
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 	public final fun writeToParcel (Landroid/os/Parcel;I)V
@@ -162,6 +185,22 @@ public final class tech/ssemaj/pipe/core/PipeMessage$Creator : android/os/Parcel
 	public final fun createFromParcel (Landroid/os/Parcel;)Ltech/ssemaj/pipe/core/PipeMessage;
 	public synthetic fun newArray (I)[Ljava/lang/Object;
 	public final fun newArray (I)[Ltech/ssemaj/pipe/core/PipeMessage;
+}
+
+public final class tech/ssemaj/pipe/core/PipeProviderUnavailableException : tech/ssemaj/pipe/core/PipeException {
+	public fun <init> (Ltech/ssemaj/pipe/core/PipeProviderUnavailableException$Unavailable;Ljava/lang/String;)V
+	public synthetic fun <init> (Ltech/ssemaj/pipe/core/PipeProviderUnavailableException$Unavailable;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getKind ()Ltech/ssemaj/pipe/core/PipeProviderUnavailableException$Unavailable;
+}
+
+public final class tech/ssemaj/pipe/core/PipeProviderUnavailableException$Unavailable : java/lang/Enum {
+	public static final field CERT_UNREADABLE Ltech/ssemaj/pipe/core/PipeProviderUnavailableException$Unavailable;
+	public static final field NOT_INSTALLED Ltech/ssemaj/pipe/core/PipeProviderUnavailableException$Unavailable;
+	public static final field NOT_VISIBLE Ltech/ssemaj/pipe/core/PipeProviderUnavailableException$Unavailable;
+	public static final field NO_SERVICE Ltech/ssemaj/pipe/core/PipeProviderUnavailableException$Unavailable;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ltech/ssemaj/pipe/core/PipeProviderUnavailableException$Unavailable;
+	public static fun values ()[Ltech/ssemaj/pipe/core/PipeProviderUnavailableException$Unavailable;
 }
 
 public final class tech/ssemaj/pipe/core/PipeRequest : android/os/Parcelable {
@@ -187,6 +226,68 @@ public final class tech/ssemaj/pipe/core/PipeRequest$Creator : android/os/Parcel
 	public final fun createFromParcel (Landroid/os/Parcel;)Ltech/ssemaj/pipe/core/PipeRequest;
 	public synthetic fun newArray (I)[Ljava/lang/Object;
 	public final fun newArray (I)[Ltech/ssemaj/pipe/core/PipeRequest;
+}
+
+public final class tech/ssemaj/pipe/core/PipeSize {
+	public fun <init> (II)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun copy (II)Ltech/ssemaj/pipe/core/PipeSize;
+	public static synthetic fun copy$default (Ltech/ssemaj/pipe/core/PipeSize;IIILjava/lang/Object;)Ltech/ssemaj/pipe/core/PipeSize;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHeightPx ()I
+	public final fun getWidthPx ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class tech/ssemaj/pipe/core/PipeState {
+}
+
+public final class tech/ssemaj/pipe/core/PipeState$Closed : tech/ssemaj/pipe/core/PipeState {
+	public fun <init> (Ltech/ssemaj/pipe/core/PipeException;)V
+	public final fun component1 ()Ltech/ssemaj/pipe/core/PipeException;
+	public final fun copy (Ltech/ssemaj/pipe/core/PipeException;)Ltech/ssemaj/pipe/core/PipeState$Closed;
+	public static synthetic fun copy$default (Ltech/ssemaj/pipe/core/PipeState$Closed;Ltech/ssemaj/pipe/core/PipeException;ILjava/lang/Object;)Ltech/ssemaj/pipe/core/PipeState$Closed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCause ()Ltech/ssemaj/pipe/core/PipeException;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class tech/ssemaj/pipe/core/PipeState$Connecting : tech/ssemaj/pipe/core/PipeState {
+	public static final field INSTANCE Ltech/ssemaj/pipe/core/PipeState$Connecting;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class tech/ssemaj/pipe/core/PipeState$Open : tech/ssemaj/pipe/core/PipeState {
+	public fun <init> (Ltech/ssemaj/pipe/auth/PeerIdentity;)V
+	public final fun component1 ()Ltech/ssemaj/pipe/auth/PeerIdentity;
+	public final fun copy (Ltech/ssemaj/pipe/auth/PeerIdentity;)Ltech/ssemaj/pipe/core/PipeState$Open;
+	public static synthetic fun copy$default (Ltech/ssemaj/pipe/core/PipeState$Open;Ltech/ssemaj/pipe/auth/PeerIdentity;ILjava/lang/Object;)Ltech/ssemaj/pipe/core/PipeState$Open;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPeer ()Ltech/ssemaj/pipe/auth/PeerIdentity;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class tech/ssemaj/pipe/core/PipeTimeoutException : tech/ssemaj/pipe/core/PipeException {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class tech/ssemaj/pipe/core/PipeTransportException : tech/ssemaj/pipe/core/PipeException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class tech/ssemaj/pipe/core/PipeVersionMismatchException : tech/ssemaj/pipe/core/PipeException {
+	public fun <init> (II)V
+	public final fun getHostVersion ()I
+	public final fun getProviderVersion ()I
 }
 
 public final class tech/ssemaj/pipe/host/HostGate {

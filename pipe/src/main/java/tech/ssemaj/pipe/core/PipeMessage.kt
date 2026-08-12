@@ -12,7 +12,9 @@ import kotlinx.parcelize.Parcelize
 data class PipeMessage(
     val payload: Bundle,
     val schemaVersion: Int = 1,
-    val seq: Long = UNSET_SEQ,
+    // library-owned; apps never set this. Internal so binary API hides it.
+    internal val seq: Long = UNSET_SEQ,
 ) : Parcelable {
     companion object { const val UNSET_SEQ = -1L }
+    internal fun withSeq(newSeq: Long) = copy(seq = newSeq)
 }
