@@ -23,4 +23,6 @@ android {
 dependencies {
     implementation(project(":pipe"))
     implementation(libs.appcompat)
+    implementation(libs.coroutines.android)
+    implementation(libs.androidx.lifecycle.runtime)
 }
