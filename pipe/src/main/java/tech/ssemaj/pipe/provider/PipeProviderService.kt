@@ -8,7 +8,12 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.view.SurfaceControlViewHost
-import kotlinx.coroutines.runBlocking
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import tech.ssemaj.pipe.auth.AndroidSigningSource
 import tech.ssemaj.pipe.auth.IdentityResolver
 import tech.ssemaj.pipe.auth.PeerIdentity
@@ -19,6 +24,7 @@ import tech.ssemaj.pipe.channel.OutboundSequencer
 import tech.ssemaj.pipe.core.CloseReason
 import tech.ssemaj.pipe.core.PipeMessage
 import tech.ssemaj.pipe.core.PipeRequest
+import tech.ssemaj.pipe.core.PipeSize
 import tech.ssemaj.pipe.transport.IEmbedProvider
 import tech.ssemaj.pipe.transport.IEmbedSession
 import tech.ssemaj.pipe.transport.IGuestChannel
@@ -30,79 +36,97 @@ import tech.ssemaj.pipe.transport.Protocol
 /**
  * Base class for pane provider services. Subclass, implement [onOpenPane],
  * export with action tech.ssemaj.pipe.action.OPEN_PANE.
+ *
+ * Multi-pane: each distinct host that opens a pane gets its own independent
+ * [ActivePane], keyed by that host's callback binder. Closing/dying of one
+ * host's pane never affects any other host's pane.
  */
 abstract class PipeProviderService : Service() {
 
     /** Policy for who may embed this pane. Default: same signing key. */
     open fun authorizer(): PipeAuthorizer = PipeAuthorizers.sameSigningKey(this)
 
-    /** Build the pane. Called on the main thread after the caller passed the gate. */
-    abstract fun onOpenPane(request: PipeRequest, host: HostHandle): PipeContent
+    /** Build the pane (or reject the request). Runs in [paneScope] (main thread). */
+    abstract suspend fun onOpenPane(request: PipeRequest, host: HostHandle): PaneResult
 
     private val mainHandler = Handler(Looper.getMainLooper())
-    private var active: ActivePane? = null
+
+    /**
+     * Service-owned scope for gating + pane construction + provider-initiated sends.
+     * Exposed as protected so provider apps can launch sends against [HostHandle.send].
+     */
+    protected val paneScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    private val panes = ConcurrentHashMap<IBinder, ActivePane>()
 
     final override fun onBind(intent: Intent?): IBinder = object : IEmbedProvider.Stub() {
         override fun protocolVersion(): Int = Protocol.VERSION
 
         override fun open(spec: OpenSpec, hostChannel: IHostChannel, callback: IOpenResultCallback) {
+            // Must be read on the binder thread, before any dispatch/coroutine hop —
+            // Binder.getCallingUid() only reflects the caller inside the transaction.
+            val callingUid = Binder.getCallingUid()
             val gate = ProviderGate(IdentityResolver(AndroidSigningSource(this@PipeProviderService)), authorizer())
-            // TEMPORARY (removed in Task 8 when this service gets a coroutine scope):
-            // bridges the now-suspend ProviderGate.admit to this non-suspend AIDL binder
-            // method (IEmbedProvider.Stub.open runs on a binder thread). WARNING:
-            // runBlocking here runs on the calling binder thread. An authorizer that
-            // hops to Dispatchers.Main / posts to a Handler and awaits it will DEADLOCK
-            // until this shim is removed in Task 8. Until then, only non-dispatching
-            // authorizers (cert checks, allowlist) are safe.
-            val result = runBlocking { gate.admit(Binder.getCallingUid(), spec.request, spec.protocolVersion) }
-            when (result) {
-                is GateResult.Refused -> { callback.onDenied(result.reason); return }
-                is GateResult.Failed -> { callback.onError(result.message); return }
-                is GateResult.Admitted -> mainHandler.post {
-                    try {
-                        openOnMain(spec, result.peer, hostChannel, callback)
-                    } catch (t: Throwable) {
-                        runCatching { callback.onError("provider failed to open pane: ${t.message}") }
+            paneScope.launch {
+                val result = gate.admit(callingUid, spec.request, spec.protocolVersion)
+                when (result) {
+                    is GateResult.Refused -> callback.onDenied(result.reason)
+                    is GateResult.Failed -> callback.onError(result.message)
+                    is GateResult.Admitted -> {
+                        try {
+                            openOnMain(spec, result.peer, hostChannel, callback)
+                        } catch (t: Throwable) {
+                            runCatching { callback.onError("provider failed to open pane: ${t.message}") }
+                        }
                     }
                 }
             }
         }
     }
 
-    private fun openOnMain(
+    private suspend fun openOnMain(
         spec: OpenSpec,
         peer: PeerIdentity,
         hostChannel: IHostChannel,
         callback: IOpenResultCallback,
     ) {
-        active?.close(CloseReason.PROVIDER_CLOSED) // one live pane per service in v1
         val outbound = OutboundSequencer()
         val hostHandle = object : HostHandle {
             override val peer: PeerIdentity = peer
-            override fun send(message: PipeMessage) {
-                runCatching { hostChannel.send(outbound.stamp(message)) }
-            }
+            override suspend fun send(message: PipeMessage): Boolean =
+                runCatching { hostChannel.send(outbound.stamp(message)) }.isSuccess
         }
-        val content = onOpenPane(spec.request, hostHandle)
-        val display = getSystemService(DisplayManager::class.java).getDisplay(spec.displayId)
-        val scvh = SurfaceControlViewHost(this, display, spec.inputTransferToken)
-        scvh.setView(content.view, spec.widthPx, spec.heightPx)
+        when (val result = onOpenPane(spec.request, hostHandle)) {
+            is PaneResult.Reject -> {
+                callback.onDenied(result.reason)
+                return
+            }
+            is PaneResult.Content -> {
+                val content = result.content
+                val display = getSystemService(DisplayManager::class.java).getDisplay(spec.displayId)
+                val scvh = SurfaceControlViewHost(this, display, spec.inputTransferToken)
+                scvh.setView(content.view, spec.widthPx, spec.heightPx)
 
-        val pane = ActivePane(scvh, content, hostChannel, mainHandler, peer.uid)
-        try {
-            // Host death → tear down our side.
-            hostChannel.asBinder().linkToDeath({ mainHandler.post { pane.close(CloseReason.PEER_DIED) } }, 0)
-            active = pane
-            callback.onOpened(scvh.surfacePackage, pane.session, pane.guestChannel)
-        } catch (t: Throwable) {
-            pane.close(CloseReason.PROVIDER_CLOSED)
-            throw t
+                val hostBinder = hostChannel.asBinder()
+                val pane = ActivePane(scvh, content, hostChannel, hostBinder, mainHandler, peer.uid)
+                try {
+                    // Host death → tear down only this host's pane.
+                    hostChannel.asBinder()
+                        .linkToDeath({ mainHandler.post { pane.close(CloseReason.PEER_DIED) } }, 0)
+                    panes[hostBinder] = pane
+                    callback.onOpened(scvh.surfacePackage, pane.session, pane.guestChannel)
+                } catch (t: Throwable) {
+                    pane.close(CloseReason.PROVIDER_CLOSED)
+                    throw t
+                }
+            }
         }
     }
 
     override fun onDestroy() {
-        active?.close(CloseReason.PROVIDER_CLOSED)
-        active = null
+        panes.values.toList().forEach { it.close(CloseReason.PROVIDER_CLOSED) }
+        panes.clear()
+        paneScope.cancel()
         super.onDestroy()
     }
 
@@ -110,6 +134,7 @@ abstract class PipeProviderService : Service() {
         private val scvh: SurfaceControlViewHost,
         private val content: PipeContent,
         private val hostChannel: IHostChannel,
+        private val hostBinder: IBinder,
         private val handler: Handler,
         /** Kernel-derived uid of the admitted host; -1 (unresolvable) skips the check. */
         private val hostUid: Int,
@@ -126,7 +151,7 @@ abstract class PipeProviderService : Service() {
                 handler.post {
                     if (closed) return@post
                     scvh.relayout(widthPx, heightPx)
-                    content.onResized(widthPx, heightPx)
+                    content.onResized(PipeSize(widthPx, heightPx))
                 }
             }
             override fun close() {
@@ -151,7 +176,7 @@ abstract class PipeProviderService : Service() {
             if (reason != CloseReason.HOST_CLOSED) {
                 runCatching { hostChannel.onClosed(reason.toWire()) }
             }
-            if (active === this) active = null
+            panes.remove(hostBinder, this)
         }
     }
 }

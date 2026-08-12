@@ -365,28 +365,54 @@ public final class tech/ssemaj/pipe/provider/GateResult$Refused : tech/ssemaj/pi
 
 public abstract interface class tech/ssemaj/pipe/provider/HostHandle {
 	public abstract fun getPeer ()Ltech/ssemaj/pipe/auth/PeerIdentity;
-	public abstract fun send (Ltech/ssemaj/pipe/core/PipeMessage;)V
+	public abstract fun send (Ltech/ssemaj/pipe/core/PipeMessage;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public abstract interface class tech/ssemaj/pipe/provider/PaneResult {
+}
+
+public final class tech/ssemaj/pipe/provider/PaneResult$Content : tech/ssemaj/pipe/provider/PaneResult {
+	public fun <init> (Ltech/ssemaj/pipe/provider/PipeContent;)V
+	public final fun component1 ()Ltech/ssemaj/pipe/provider/PipeContent;
+	public final fun copy (Ltech/ssemaj/pipe/provider/PipeContent;)Ltech/ssemaj/pipe/provider/PaneResult$Content;
+	public static synthetic fun copy$default (Ltech/ssemaj/pipe/provider/PaneResult$Content;Ltech/ssemaj/pipe/provider/PipeContent;ILjava/lang/Object;)Ltech/ssemaj/pipe/provider/PaneResult$Content;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getContent ()Ltech/ssemaj/pipe/provider/PipeContent;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class tech/ssemaj/pipe/provider/PaneResult$Reject : tech/ssemaj/pipe/provider/PaneResult {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Ltech/ssemaj/pipe/provider/PaneResult$Reject;
+	public static synthetic fun copy$default (Ltech/ssemaj/pipe/provider/PaneResult$Reject;Ljava/lang/String;ILjava/lang/Object;)Ltech/ssemaj/pipe/provider/PaneResult$Reject;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public abstract interface class tech/ssemaj/pipe/provider/PipeContent {
 	public abstract fun getView ()Landroid/view/View;
 	public fun onClosed (Ltech/ssemaj/pipe/core/CloseReason;)V
 	public fun onMessage (Ltech/ssemaj/pipe/core/PipeMessage;)V
-	public fun onResized (II)V
+	public fun onResized (Ltech/ssemaj/pipe/core/PipeSize;)V
 }
 
 public final class tech/ssemaj/pipe/provider/PipeContent$DefaultImpls {
 	public static fun onClosed (Ltech/ssemaj/pipe/provider/PipeContent;Ltech/ssemaj/pipe/core/CloseReason;)V
 	public static fun onMessage (Ltech/ssemaj/pipe/provider/PipeContent;Ltech/ssemaj/pipe/core/PipeMessage;)V
-	public static fun onResized (Ltech/ssemaj/pipe/provider/PipeContent;II)V
+	public static fun onResized (Ltech/ssemaj/pipe/provider/PipeContent;Ltech/ssemaj/pipe/core/PipeSize;)V
 }
 
 public abstract class tech/ssemaj/pipe/provider/PipeProviderService : android/app/Service {
 	public fun <init> ()V
 	public fun authorizer ()Ltech/ssemaj/pipe/auth/PipeAuthorizer;
+	protected final fun getPaneScope ()Lkotlinx/coroutines/CoroutineScope;
 	public final fun onBind (Landroid/content/Intent;)Landroid/os/IBinder;
 	public fun onDestroy ()V
-	public abstract fun onOpenPane (Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/provider/HostHandle;)Ltech/ssemaj/pipe/provider/PipeContent;
+	public abstract fun onOpenPane (Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/provider/HostHandle;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class tech/ssemaj/pipe/provider/ProviderGate {

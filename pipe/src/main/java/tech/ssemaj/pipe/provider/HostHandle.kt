@@ -5,6 +5,6 @@ import tech.ssemaj.pipe.core.PipeMessage
 
 /** Provider app's handle back to the (verified) host. */
 interface HostHandle {
-    fun send(message: PipeMessage)
     val peer: PeerIdentity
+    suspend fun send(message: PipeMessage): Boolean
 }
