@@ -15,6 +15,7 @@ import android.view.SurfaceControlViewHost.SurfacePackage
 import android.view.SurfaceView
 import android.view.WindowManager
 import android.widget.FrameLayout
+import kotlinx.coroutines.runBlocking
 import tech.ssemaj.pipe.auth.AndroidSigningSource
 import tech.ssemaj.pipe.auth.IdentityResolver
 import tech.ssemaj.pipe.auth.PeerIdentity
@@ -87,7 +88,13 @@ class PipeView @JvmOverloads constructor(
         current = attempt
 
         val gate = HostGate(IdentityResolver(AndroidSigningSource(context)), authorizer)
-        when (val result = gate.admit(provider, request)) {
+        // TEMPORARY (removed in Task 7 when PipeView.open becomes suspend): bridges the
+        // suspend HostGate.admit to this non-suspend call site (PipeView.open runs on the
+        // main thread). WARNING: runBlocking here runs on the main thread. An authorizer
+        // that hops to Dispatchers.Main / posts to a Handler and awaits it will DEADLOCK
+        // until this shim is removed in Task 7. Until then, only non-dispatching
+        // authorizers (cert checks, allowlist) are safe.
+        when (val result = runBlocking { gate.admit(provider, request) }) {
             is GateResult.Refused -> {
                 current = null
                 attempt.closed = true

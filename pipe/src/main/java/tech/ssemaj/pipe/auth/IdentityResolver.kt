@@ -20,7 +20,8 @@ class IdentityResolver(private val source: SigningSource) {
     fun forPackage(packageName: String, uid: Int = -1): PeerIdentity? {
         val lineage = source.certLineageSha256(packageName)
         if (lineage.isEmpty()) return null
-        return PeerIdentity(uid, listOf(packageName), lineage)
+        val resolvedUid = if (uid == -1) source.uidForPackage(packageName) else uid
+        return PeerIdentity(resolvedUid, listOf(packageName), lineage)
     }
 
     /** Uid currently assigned to [packageName], or -1 if unresolvable. Never throws. */

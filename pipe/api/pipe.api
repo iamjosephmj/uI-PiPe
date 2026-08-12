@@ -289,7 +289,7 @@ public final class tech/ssemaj/pipe/core/PipeVersionMismatchException : tech/sse
 
 public final class tech/ssemaj/pipe/host/HostGate {
 	public fun <init> (Ltech/ssemaj/pipe/auth/IdentityResolver;Ltech/ssemaj/pipe/auth/PipeAuthorizer;)V
-	public final fun admit (Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;)Ltech/ssemaj/pipe/provider/GateResult;
+	public final fun admit (Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public abstract interface class tech/ssemaj/pipe/host/PipeHostCallbacks {
