@@ -1,7 +1,7 @@
 # Pipe — gated app-to-app embeddable UI (design)
 
 **Date:** 2026-08-12
-**Status:** design, pending review
+**Status:** implemented (v1)
 **Project:** `~/AndroidStudioProjects/pipe`
 
 ## Summary
@@ -167,3 +167,9 @@ interface HostHandle { fun send(message: PipeMessage); val peer: PeerIdentity }
 1. Confirm `minSdk = 35` for v1 (vs a lower floor with degraded input).
 2. Single artifact vs `pipe-core`/`pipe-host`/`pipe-provider` split (v1 = single).
 3. `PipeMessage` payload type: `Bundle` (simple) vs `ByteArray` + app-owned codec (leaner, versionable). Leaning `Bundle` for v1.
+
+### Resolutions (v1)
+
+1. `minSdk = 35` confirmed — shipped in `:pipe`, `:sample-host`, `:sample-provider`, `:evil-host`, `:evil-provider`.
+2. Single artifact confirmed — `:pipe` (namespace `tech.ssemaj.pipe`) ships host, provider, and shared-core facets together; no split.
+3. `Bundle` payload confirmed — `PipeMessage.payload: Bundle`, with library-owned `seq` and app-owned `schemaVersion`.
