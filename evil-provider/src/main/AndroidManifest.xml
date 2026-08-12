@@ -1,0 +1,11 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:label="Pipe Evil Provider">
+        <service
+            android:name=".EvilPaneService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="tech.ssemaj.pipe.action.OPEN_PANE" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

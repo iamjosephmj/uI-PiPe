@@ -221,13 +221,26 @@ class PipeView @JvmOverloads constructor(
                 }
             }
             override fun onDenied(reason: String) {
-                mainHandler.post { callbacks.onDenied(reason); close(CloseReason.PROVIDER_CLOSED, notifyProvider = false) }
+                mainHandler.post { terminate { callbacks.onDenied(reason) } }
             }
             override fun onError(message: String) {
                 mainHandler.post {
-                    callbacks.onError(PipeError(PipeError.Code.TRANSPORT_FAILURE, message))
-                    close(CloseReason.PROVIDER_CLOSED, notifyProvider = false)
+                    terminate { callbacks.onError(PipeError(PipeError.Code.TRANSPORT_FAILURE, message)) }
                 }
+            }
+
+            /**
+             * Tear down a never-opened attempt (denied or errored before onOpened) without
+             * firing onClosed: nothing was ever opened, so there is nothing to "close", and a
+             * trailing onClosed would immediately clobber the terminal callback's UI state.
+             */
+            private fun terminate(deliver: () -> Unit) {
+                if (closed) return
+                closed = true
+                if (bound) runCatching { context.unbindService(connection) }
+                bound = false
+                if (current === this@OpenAttempt) { current = null; embeddedInputToken = null }
+                deliver()
             }
         }
 
