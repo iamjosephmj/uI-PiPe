@@ -27,9 +27,9 @@ Status: **v2, implemented.** Coroutine-first API, three presentation modes (embe
 
 ## Requirements
 
-- **`minSdk = 35`** (Android 15) for both host and provider apps.
+- **`minSdk = 35`** (Android 15) for both host and provider apps — an implementation choice, not a hard platform limit.
 
-  Clean cross-process input **and IME** delivery requires `android.window.InputTransferToken`, which only exists from API 35. There is no lower-SDK degraded-input fallback.
+  Cross-process embedding (`SurfaceControlViewHost`) and embedded **touch** input have existed since API 30 (Android 11). Pipe sets its floor at 35 because it builds on the *public* input-transfer APIs added there — `android.window.InputTransferToken` and `WindowManager.transferTouchGesture()` — which also make cross-process **IME** clean and reliable (the real weak spot before 35, when the equivalent wiring relied on hidden APIs). A lower floor toward 30, with a pre-35 input path, is feasible but not currently implemented.
 - `compileSdk = 36`, Kotlin, coroutines. The wire types are `@Parcelize` classes (`kotlin-parcelize`).
 - The provider service must be `android:exported="true"` with the `tech.ssemaj.pipe.action.OPEN_PANE` intent-filter action.
 
@@ -288,7 +288,7 @@ Full build of all modules:
 
 ## Known limitations
 
-- **`minSdk = 35`** — a deliberately high floor (the input model depends on API 35 `InputTransferToken`).
+- **`minSdk = 35`** — a deliberately high floor and an implementation choice: Pipe builds on the public `InputTransferToken` / `transferTouchGesture` APIs (API 35). `SurfaceControlViewHost` embedding and touch go back to API 30; a lower floor means a pre-35 input path (hidden-API wiring, weaker IME on 30–34) and isn't currently implemented.
 - **Embedded single-gesture-per-session** — an embedded pane reliably receives only the *first* interactive gesture of a session; treat an embedded session as single-interaction and reopen for the next (the sample host demonstrates this). Full-screen and dialog modes are unaffected.
 - **Coarse-grained by design** — every message is a binder transaction; Pipe suits pane-render + occasional messages, not high-frequency small-message loops.
 - **Alpha** — a coherent, adversarially-tested alpha, not yet a hardened release.

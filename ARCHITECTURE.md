@@ -270,7 +270,7 @@ Full-screen and dialog wrap the same `PipeView` and reuse the same `open()` / `P
 
 ### Cross-process input — and its one sharp edge
 
-A plain `SurfaceView` does **not** forward touches into an embedded `SurfaceControlViewHost`. The host must hand each gesture across using the platform's `InputTransferToken`:
+A plain `SurfaceView` does **not** forward touches into an embedded `SurfaceControlViewHost`. Pipe hands each gesture across using the *public* input-transfer APIs added in API 35 — `android.window.InputTransferToken` and `WindowManager.transferTouchGesture()`. (Cross-process embedded touch itself is older — `SurfaceControlViewHost` has received input since API 30 via a host `IBinder` token — but that path was hidden/`@hide` and its IME/focus story was weak. Pipe builds on the 35 public path by choice; see §13.)
 
 - **Embedded mode** transfers the *current* gesture on every `ACTION_DOWN` via `WindowManager.transferTouchGesture(hostToken, embeddedToken)`. This is required because the host's own content may sit above the pane.
 - **Full-screen / dialog mode** — where the pane is the entire interactive surface — instead render the pane surface on top (`setZOrderOnTop(true)`) and let the embedded window receive input **directly and persistently**, so repeated gestures work naturally.
@@ -308,13 +308,13 @@ Errors surface as a small `PipeException` hierarchy (`PipeDeniedException`, `Pip
 
 - Open, unvetted provider ecosystems. The trust anchor is signing identity (same key or an allowlist); there is no runtime sandbox around arbitrary provider code beyond process isolation.
 - Protecting a provider from a host that legitimately embeds it (the host owns the window it draws into).
-- Lower-SDK devices — the input model depends on API 35 `InputTransferToken`; there is no degraded-input fallback.
+- Lower-SDK devices — Pipe's input model is built on the API 35 `InputTransferToken` / `transferTouchGesture` public APIs, and there is no pre-35 fallback in this build (see §13 for what a lower floor would take).
 
 ---
 
 ## 13. Known limitations & non-goals
 
-- **`minSdk = 35` (Android 15).** Clean cross-process input + IME requires `InputTransferToken`, which only exists from API 35. This is a deliberate, high floor.
+- **`minSdk = 35` (Android 15) — an implementation choice, not a platform limit.** `SurfaceControlViewHost` embedding *and* interactive **touch** have existed since API 30 (Android 11). Pipe sets its floor at 35 because it builds on the *public* input-transfer APIs added there (`InputTransferToken` + `transferTouchGesture`), which also make cross-process **IME** clean and reliable — the genuinely weak spot before 35. Lowering the floor toward 30 is feasible (a pre-35 host-token input path, with weaker IME on 30–34) but is not currently implemented.
 - **Embedded single-gesture-per-session** (§9) — the primary interactive limitation.
 - **IPC granularity** — every message is a binder transaction; Pipe suits coarse-grained handoffs, not high-frequency small-message loops.
 - **Per-process cost** — a second process carries a fixed memory/startup tax; "extra heap" is not free, and cold open has real latency (bind + handshake + surface attach).
