@@ -19,7 +19,12 @@ class ProviderGate(
     private val resolver: IdentityResolver,
     private val authorizer: PipeAuthorizer,
 ) {
-    // TODO(task 4-8): thread a suspend admit() through the AIDL boundary instead of runBlocking.
+    // TEMPORARY (removed in Task 4/5 when this gate becomes suspend): bridges the
+    // suspend authorizer to this non-suspend call site. WARNING: runBlocking here runs
+    // on the caller thread (a binder thread, via IEmbedProvider.Stub.open). An authorizer
+    // that hops to Dispatchers.Main / posts to a Handler and awaits it will DEADLOCK
+    // until this shim is removed. Until Task 4/5 land, only non-dispatching authorizers
+    // (cert checks, allowlist) are safe.
     fun admit(callingUid: Int, request: PipeRequest, protocolVersion: Int): GateResult {
         if (protocolVersion != Protocol.VERSION) {
             return GateResult.Failed("protocol version mismatch: host=$protocolVersion provider=${Protocol.VERSION}")

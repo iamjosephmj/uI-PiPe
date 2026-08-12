@@ -12,7 +12,12 @@ class HostGate(
     private val resolver: IdentityResolver,
     private val authorizer: PipeAuthorizer,
 ) {
-    // TODO(task 4-8): thread a suspend admit() through PipeView.open instead of runBlocking.
+    // TEMPORARY (removed in Task 4/5 when this gate becomes suspend): bridges the
+    // suspend authorizer to this non-suspend call site. WARNING: runBlocking here runs
+    // on the caller thread (the main thread, via PipeView.open). An authorizer that hops
+    // to Dispatchers.Main / posts to a Handler and awaits it will DEADLOCK until this
+    // shim is removed. Until Task 4/5 land, only non-dispatching authorizers (cert
+    // checks, allowlist) are safe.
     fun admit(component: ProviderComponent, request: PipeRequest): GateResult {
         val uid = resolver.uidForPackage(component.packageName)
         val peer = resolver.forPackage(component.packageName, uid)
