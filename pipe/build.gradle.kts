@@ -21,6 +21,7 @@ android {
 
 dependencies {
     implementation(libs.coroutines.android)
+    implementation(libs.androidx.lifecycle.runtime)
     implementation("androidx.annotation:annotation:1.9.1")
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)

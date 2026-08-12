@@ -292,38 +292,25 @@ public final class tech/ssemaj/pipe/host/HostGate {
 	public final fun admit (Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
-public abstract interface class tech/ssemaj/pipe/host/PipeHostCallbacks {
-	public fun onClosed (Ltech/ssemaj/pipe/core/CloseReason;)V
-	public fun onDenied (Ljava/lang/String;)V
-	public fun onError (Ltech/ssemaj/pipe/core/PipeError;)V
-	public fun onMessage (Ltech/ssemaj/pipe/core/PipeMessage;)V
-	public fun onOpened (Ltech/ssemaj/pipe/host/PipeSession;)V
-	public fun onResized (II)V
-}
-
-public final class tech/ssemaj/pipe/host/PipeHostCallbacks$DefaultImpls {
-	public static fun onClosed (Ltech/ssemaj/pipe/host/PipeHostCallbacks;Ltech/ssemaj/pipe/core/CloseReason;)V
-	public static fun onDenied (Ltech/ssemaj/pipe/host/PipeHostCallbacks;Ljava/lang/String;)V
-	public static fun onError (Ltech/ssemaj/pipe/host/PipeHostCallbacks;Ltech/ssemaj/pipe/core/PipeError;)V
-	public static fun onMessage (Ltech/ssemaj/pipe/host/PipeHostCallbacks;Ltech/ssemaj/pipe/core/PipeMessage;)V
-	public static fun onOpened (Ltech/ssemaj/pipe/host/PipeHostCallbacks;Ltech/ssemaj/pipe/host/PipeSession;)V
-	public static fun onResized (Ltech/ssemaj/pipe/host/PipeHostCallbacks;II)V
-}
-
 public abstract interface class tech/ssemaj/pipe/host/PipeSession {
 	public abstract fun close ()V
+	public abstract fun getMessages ()Lkotlinx/coroutines/flow/Flow;
 	public abstract fun getPeer ()Ltech/ssemaj/pipe/auth/PeerIdentity;
-	public abstract fun resize (II)V
-	public abstract fun send (Ltech/ssemaj/pipe/core/PipeMessage;)V
+	public abstract fun getState ()Lkotlinx/coroutines/flow/StateFlow;
+	public abstract fun resize (Ltech/ssemaj/pipe/core/PipeSize;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun send (Ltech/ssemaj/pipe/core/PipeMessage;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class tech/ssemaj/pipe/host/PipeView : android/widget/FrameLayout {
 	public fun <init> (Landroid/content/Context;)V
 	public fun <init> (Landroid/content/Context;Landroid/util/AttributeSet;)V
-	public synthetic fun <init> (Landroid/content/Context;Landroid/util/AttributeSet;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun closePane ()V
-	public final fun open (Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/PipeAuthorizer;Ltech/ssemaj/pipe/host/PipeHostCallbacks;)Ltech/ssemaj/pipe/host/PipeSession;
-	public static synthetic fun open$default (Ltech/ssemaj/pipe/host/PipeView;Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/PipeAuthorizer;Ltech/ssemaj/pipe/host/PipeHostCallbacks;ILjava/lang/Object;)Ltech/ssemaj/pipe/host/PipeSession;
+	public fun <init> (Landroid/content/Context;Landroid/util/AttributeSet;Lkotlinx/coroutines/CoroutineDispatcher;)V
+	public synthetic fun <init> (Landroid/content/Context;Landroid/util/AttributeSet;Lkotlinx/coroutines/CoroutineDispatcher;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun close ()V
+	public final fun open-zkXUZaI (Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/PipeAuthorizer;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun open-zkXUZaI$default (Ltech/ssemaj/pipe/host/PipeView;Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/PipeAuthorizer;JLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun openIn (Landroidx/lifecycle/LifecycleOwner;Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/PipeAuthorizer;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lkotlinx/coroutines/Job;
+	public static synthetic fun openIn$default (Ltech/ssemaj/pipe/host/PipeView;Landroidx/lifecycle/LifecycleOwner;Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/PipeAuthorizer;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lkotlinx/coroutines/Job;
 }
 
 public final class tech/ssemaj/pipe/host/ProviderComponent {
