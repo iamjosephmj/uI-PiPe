@@ -1,7 +1,9 @@
 package tech.ssemaj.pipe.samplehost.data
 
 /** Just enough DER to walk the Android key-attestation KeyDescription sequence. Not general-purpose. */
-internal object Der {
+internal object
+
+Der {
     internal data class Tlv(val tag: Int, val value: ByteArray, val end: Int)
 
     internal fun parse(bytes: ByteArray, offset: Int): Tlv {

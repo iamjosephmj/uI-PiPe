@@ -3,7 +3,7 @@
         <package android:name="tech.ssemaj.pipe.sampleprovider" />
         <package android:name="tech.ssemaj.pipe.evilprovider" />
     </queries>
-    <application android:label="Pipe Sample Host" android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+    <application android:label="Pipe Sample Host" android:theme="@style/Theme.PipeHost">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

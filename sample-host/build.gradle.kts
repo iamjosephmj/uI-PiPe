@@ -30,7 +30,6 @@ dependencies {
     implementation(project(":pipe"))
     implementation(project(":pipe-serialization"))
     implementation(project(":sample-contract"))
-    implementation(libs.appcompat) // dropped in the Compose rewrite (certification plan Task 7)
     implementation(libs.coroutines.android)
     implementation(libs.androidx.lifecycle.runtime)
     implementation(platform(libs.compose.bom))

@@ -8,6 +8,7 @@ import tech.ssemaj.pipe.samples.contract.CertificationRequest
 import tech.ssemaj.pipe.samples.contract.CertificationResponse
 import tech.ssemaj.pipe.serialization.messagesOf
 import tech.ssemaj.pipe.serialization.send
+import kotlin.time.Duration.Companion.milliseconds
 
 class RequestCertificationUseCase(
     private val nonceSource: () -> ByteArray = { ByteArray(32).also { SecureRandom().nextBytes(it) } },
@@ -21,7 +22,7 @@ class RequestCertificationUseCase(
     suspend operator fun invoke(session: PipeSession, hostDisplayName: String): Outcome {
         val nonce = nonceSource()
         session.send(CertificationRequest(nonce, hostDisplayName))
-        val response = withTimeoutOrNull(RESPONSE_TIMEOUT_MS) {
+        val response = withTimeoutOrNull(RESPONSE_TIMEOUT_MS.milliseconds) {
             session.messagesOf<CertificationResponse>().first()
         } ?: return Outcome.Timeout
         return when (response) {
