@@ -10,6 +10,12 @@ A *host* places a pane in its layout; a *provider* renders a `View` into it, in 
 
 **Status:** first release (`1.0.0-alpha01`). Android 15+ (`minSdk 35`). Targets a closed app family / vetted partners, not an open marketplace. Deep dive: **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
+## See it in action
+
+The sample apps run a real cross-process certification: the host sends a challenge, the provider renders a consent pane *in its own process*, signs the nonce with an AndroidKeyStore key, and the host verifies the attestation chain — all inside the host's window.
+
+<p align="center"><img src="docs/media/flow.svg" width="760" alt="A live certification: idle pane-ready → consent with Approve → verifying → Hardware-verified, with the nonce and signed response crossing between host and provider"></p>
+
 ## How it works
 
 Every open is a mutual, cryptographically-gated handshake — identity is kernel/PackageManager-derived on both ends, never self-reported, and a denial produces no bind and no surface.
