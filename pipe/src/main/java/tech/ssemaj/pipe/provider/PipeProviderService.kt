@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.view.SurfaceControlViewHost
+import kotlinx.coroutines.runBlocking
 import tech.ssemaj.pipe.auth.AndroidSigningSource
 import tech.ssemaj.pipe.auth.IdentityResolver
 import tech.ssemaj.pipe.auth.PeerIdentity
@@ -46,7 +47,14 @@ abstract class PipeProviderService : Service() {
 
         override fun open(spec: OpenSpec, hostChannel: IHostChannel, callback: IOpenResultCallback) {
             val gate = ProviderGate(IdentityResolver(AndroidSigningSource(this@PipeProviderService)), authorizer())
-            val result = gate.admit(Binder.getCallingUid(), spec.request, spec.protocolVersion)
+            // TEMPORARY (removed in Task 8 when this service gets a coroutine scope):
+            // bridges the now-suspend ProviderGate.admit to this non-suspend AIDL binder
+            // method (IEmbedProvider.Stub.open runs on a binder thread). WARNING:
+            // runBlocking here runs on the calling binder thread. An authorizer that
+            // hops to Dispatchers.Main / posts to a Handler and awaits it will DEADLOCK
+            // until this shim is removed in Task 8. Until then, only non-dispatching
+            // authorizers (cert checks, allowlist) are safe.
+            val result = runBlocking { gate.admit(Binder.getCallingUid(), spec.request, spec.protocolVersion) }
             when (result) {
                 is GateResult.Refused -> { callback.onDenied(result.reason); return }
                 is GateResult.Failed -> { callback.onError(result.message); return }

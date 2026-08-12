@@ -404,7 +404,7 @@ public abstract class tech/ssemaj/pipe/provider/PipeProviderService : android/ap
 
 public final class tech/ssemaj/pipe/provider/ProviderGate {
 	public fun <init> (Ltech/ssemaj/pipe/auth/IdentityResolver;Ltech/ssemaj/pipe/auth/PipeAuthorizer;)V
-	public final fun admit (ILtech/ssemaj/pipe/core/PipeRequest;I)Ltech/ssemaj/pipe/provider/GateResult;
+	public final fun admit (ILtech/ssemaj/pipe/core/PipeRequest;ILkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public abstract interface class tech/ssemaj/pipe/transport/IEmbedProvider : android/os/IInterface {
