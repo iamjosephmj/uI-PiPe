@@ -35,7 +35,7 @@ dependencies {
 publishing {
     publications {
         register<MavenPublication>("release") {
-            groupId = "tech.ssemaj.pipe"; artifactId = "pipe-serialization"; version = "2.0.0-alpha01"
+            groupId = "tech.ssemaj.pipe"; artifactId = "pipe-serialization"; version = "1.0.0-alpha01"
             afterEvaluate { from(components["release"]) }
         }
     }

@@ -4,9 +4,9 @@
 
 Both apps opt in, each verifies the other's signing identity before anything crosses, and the host controls placement, size, lifetime, and revocation. Pipe uses only the platform's sanctioned cross-process UI APIs — no window-token or draw-over side channel.
 
-The payoff is real isolation: the pane renders on the **provider's** main thread and heap, so host jank never stalls the pane and a provider crash can't take down the host — while a signing-identity gate keeps the two apps in distinct trust domains.
+**Two UI threads, two render threads, two heaps and two GCs — a whole second runtime working for you, isolated from yours.** The pane renders on the *provider's* main thread and heap, so host jank never stalls the pane and a provider crash can't take down the host — while a signing-identity gate keeps the two apps in distinct trust domains. (Isolation, not extra CPU: the two runtimes still share the device's cores.)
 
-Status: **v2, implemented.** Coroutine-first API, three presentation modes (embedded / full-screen / dialog), opt-in typed messaging. Targets a **closed app family / vetted partners**, not an open marketplace.
+Status: **implemented — first release.** Coroutine-first API, three presentation modes (embedded / full-screen / dialog), opt-in typed messaging. Targets a **closed app family / vetted partners**, not an open marketplace.
 
 > **How it works:** [`ARCHITECTURE.md`](ARCHITECTURE.md) covers the process/threading model, the wire protocol, the trust model, and the presentation modes in depth. This README is the task-level guide.
 
@@ -37,9 +37,9 @@ Status: **v2, implemented.** Coroutine-first API, three presentation modes (embe
 
 ```kotlin
 dependencies {
-    implementation("tech.ssemaj.pipe:pipe:2.0.0-alpha01")
+    implementation("tech.ssemaj.pipe:pipe:1.0.0-alpha01")
     // Optional: typed (@Serializable) messages over the pipe.
-    implementation("tech.ssemaj.pipe:pipe-serialization:2.0.0-alpha01")
+    implementation("tech.ssemaj.pipe:pipe-serialization:1.0.0-alpha01")
 }
 ```
 
