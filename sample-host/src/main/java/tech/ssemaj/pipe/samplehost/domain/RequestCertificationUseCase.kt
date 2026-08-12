@@ -1,7 +1,7 @@
 package tech.ssemaj.pipe.samplehost.domain
 
 import java.security.SecureRandom
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withTimeoutOrNull
 import tech.ssemaj.pipe.host.PipeSession
 import tech.ssemaj.pipe.samples.contract.CertificationRequest
@@ -22,8 +22,12 @@ class RequestCertificationUseCase(
     suspend operator fun invoke(session: PipeSession, hostDisplayName: String): Outcome {
         val nonce = nonceSource()
         session.send(CertificationRequest(nonce, hostDisplayName))
+        // firstOrNull (not first): if the session closes before any response — e.g. the user
+        // dismisses a dialog/full-screen pane by tapping the scrim or pressing back — the messages
+        // flow completes empty. first() would throw NoSuchElementException synchronously on the main
+        // thread during teardown and crash the app; firstOrNull yields null → a clean Timeout.
         val response = withTimeoutOrNull(RESPONSE_TIMEOUT_MS.milliseconds) {
-            session.messagesOf<CertificationResponse>().first()
+            session.messagesOf<CertificationResponse>().firstOrNull()
         } ?: return Outcome.Timeout
         return when (response) {
             is CertificationResponse.Granted -> Outcome.NeedsVerification(nonce, response)
