@@ -7,8 +7,10 @@ import android.os.Binder
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import android.view.SurfaceControlViewHost
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -55,7 +57,10 @@ abstract class PipeProviderService : Service() {
      * Service-owned scope for gating + pane construction + provider-initiated sends.
      * Exposed as protected so provider apps can launch sends against [HostHandle.send].
      */
-    protected val paneScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    protected val paneScope: CoroutineScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Main.immediate +
+            CoroutineExceptionHandler { _, t -> Log.w("PipeProviderService", "pane coroutine failed", t) },
+    )
 
     private val panes = ConcurrentHashMap<IBinder, ActivePane>()
 
@@ -70,8 +75,8 @@ abstract class PipeProviderService : Service() {
             paneScope.launch {
                 val result = gate.admit(callingUid, spec.request, spec.protocolVersion)
                 when (result) {
-                    is GateResult.Refused -> callback.onDenied(result.reason)
-                    is GateResult.Failed -> callback.onError(result.message)
+                    is GateResult.Refused -> runCatching { callback.onDenied(result.reason) }
+                    is GateResult.Failed -> runCatching { callback.onError(result.message) }
                     is GateResult.Admitted -> {
                         try {
                             openOnMain(spec, result.peer, hostChannel, callback)
@@ -113,7 +118,10 @@ abstract class PipeProviderService : Service() {
                     // Host death → tear down only this host's pane.
                     hostChannel.asBinder()
                         .linkToDeath({ mainHandler.post { pane.close(CloseReason.PEER_DIED) } }, 0)
-                    panes[hostBinder] = pane
+                    // Same-host re-open: close and release the previously registered pane
+                    // for this host binder so its SCVH surface isn't leaked. A different
+                    // host's binder is a different map key, so it is unaffected.
+                    panes.put(hostBinder, pane)?.close(CloseReason.PROVIDER_CLOSED)
                     callback.onOpened(scvh.surfacePackage, pane.session, pane.guestChannel)
                 } catch (t: Throwable) {
                     pane.close(CloseReason.PROVIDER_CLOSED)
