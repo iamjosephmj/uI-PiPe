@@ -81,10 +81,15 @@ abstract class PipeProviderService : Service() {
         scvh.setView(content.view, spec.widthPx, spec.heightPx)
 
         val pane = ActivePane(scvh, content, hostChannel, mainHandler)
-        active = pane
-        // Host death → tear down our side.
-        hostChannel.asBinder().linkToDeath({ mainHandler.post { pane.close(CloseReason.PEER_DIED) } }, 0)
-        callback.onOpened(scvh.surfacePackage, pane.session, pane.guestChannel)
+        try {
+            // Host death → tear down our side.
+            hostChannel.asBinder().linkToDeath({ mainHandler.post { pane.close(CloseReason.PEER_DIED) } }, 0)
+            active = pane
+            callback.onOpened(scvh.surfacePackage, pane.session, pane.guestChannel)
+        } catch (t: Throwable) {
+            pane.close(CloseReason.PROVIDER_CLOSED)
+            throw t
+        }
     }
 
     override fun onDestroy() {
