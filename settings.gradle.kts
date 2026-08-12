@@ -7,6 +7,7 @@ dependencyResolutionManagement {
 }
 rootProject.name = "pipe"
 include(":pipe")
+include(":pipe-serialization")
 include(":sample-provider")
 include(":sample-host")
 include(":evil-provider")

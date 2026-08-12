@@ -1,0 +1,6 @@
+public final class tech/ssemaj/pipe/serialization/PipeCodec {
+	public static final field INSTANCE Ltech/ssemaj/pipe/serialization/PipeCodec;
+	public static final field KEY_BYTES Ljava/lang/String;
+	public static final field KEY_TYPE Ljava/lang/String;
+}
+
