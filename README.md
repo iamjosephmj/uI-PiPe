@@ -2,7 +2,9 @@
 
 **Pipe** is an Android library that lets one app render a **live, fully-interactive UI inside another app's window** — cooperatively and with a cryptographic gate on both ends. A *host* app embeds a `PipeView` in its layout; a *provider* app renders a `View` into it, over the platform's `SurfaceControlViewHost` transport, with a two-way typed message channel between them. Both apps opt in, each verifies the other's signing identity, and the host controls placement, size, lifetime, and revocation — it deliberately does **not** rely on any window-token/overlay side channel, only the platform's sanctioned cross-process UI APIs.
 
-Status: **v1, implemented.** Single artifact, `:pipe` (namespace `tech.ssemaj.pipe`). Targets a **closed app family / vetted partners**, not an open marketplace.
+Status: **v2, implemented** — coroutine-first API, three presentation modes (embedded, full-screen, dialog), and opt-in typed messaging. Single core artifact, `:pipe` (namespace `tech.ssemaj.pipe`). Targets a **closed app family / vetted partners**, not an open marketplace.
+
+> **New here?** Read [`ARCHITECTURE.md`](ARCHITECTURE.md) for how Pipe works — the process/threading model, the wire protocol, the trust model, and the presentation modes.
 
 ## Requirements
 
