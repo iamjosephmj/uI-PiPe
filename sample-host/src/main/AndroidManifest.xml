@@ -10,6 +10,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".MultiPaneActivity" android:exported="false" />
+        <activity
+            android:name=".MultiPaneActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Material3.DayNight.NoActionBar" />
     </application>
 </manifest>

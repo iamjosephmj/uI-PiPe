@@ -39,6 +39,7 @@ dependencies {
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.serialization.cbor)
+    implementation(libs.material.components)
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.bcpkix)

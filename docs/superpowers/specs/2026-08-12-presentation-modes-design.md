@@ -1,6 +1,6 @@
 # Pipe Presentation Modes — full-screen and dialog pipes
 
-**Status:** approved (design)
+**Status:** implemented
 **Date:** 2026-08-12
 **Depends on:** pipe v2 phase 1 + certification demo. Extends the host-side surface; the provider API is unchanged.
 
