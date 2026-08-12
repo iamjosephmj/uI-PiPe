@@ -10,8 +10,7 @@ class PipeDeniedException(val reason: String, val source: DenialSource) :
 
 class PipeTimeoutException(message: String = "Timed out opening pane") : PipeException(message)
 
-class PipeProviderUnavailableException(val kind: Unavailable, message: String = kind.name) :
-    PipeException(message) {
+class PipeProviderUnavailableException(val kind: Unavailable) : PipeException(kind.name) {
     enum class Unavailable { NOT_INSTALLED, NOT_VISIBLE, CERT_UNREADABLE, NO_SERVICE }
 }
 

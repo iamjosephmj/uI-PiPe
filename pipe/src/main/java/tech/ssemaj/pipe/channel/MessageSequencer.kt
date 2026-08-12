@@ -6,7 +6,7 @@ import tech.ssemaj.pipe.core.PipeMessage
 /** Stamps outgoing messages with a monotonically increasing seq. */
 class OutboundSequencer {
     private val next = AtomicLong(0)
-    fun stamp(message: PipeMessage): PipeMessage = message.copy(seq = next.getAndIncrement())
+    fun stamp(message: PipeMessage): PipeMessage = message.withSeq(next.getAndIncrement())
 }
 
 /**
