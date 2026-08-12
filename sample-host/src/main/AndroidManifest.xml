@@ -10,5 +10,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".MultiPaneActivity" android:exported="false" />
     </application>
 </manifest>
