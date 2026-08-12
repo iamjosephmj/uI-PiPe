@@ -25,6 +25,28 @@ class CertificationViewModel(
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     private var stateWatcher: Job? = null
+    private var provider: ProviderComponent? = null
+
+    /** Called once from MainActivity so [openFullScreen] can reuse the same provider target. */
+    fun setProvider(provider: ProviderComponent) {
+        this.provider = provider
+    }
+
+    fun openFullScreen(activity: androidx.activity.ComponentActivity) {
+        val provider = provider ?: return
+        tech.ssemaj.pipe.host.PipeFullScreen.open(
+            activity = activity,
+            provider = provider,
+            request = tech.ssemaj.pipe.core.PipeRequest(
+                tech.ssemaj.pipe.samples.contract.ACTION_CERTIFICATION,
+                presentation = tech.ssemaj.pipe.core.PipePresentation.FULL_SCREEN,
+            ),
+            onSession = { session ->
+                // Drive the flow: send the request so the pane shows consent immediately.
+                viewModelScope.launch { container.requestCertification(session, "Pipe Sample Host") }
+            },
+        )
+    }
 
     /** Called from the AndroidView factory each time a pane view is (re)created. */
     fun onPaneViewReady(view: PipeView, provider: ProviderComponent, authorizer: PipeAuthorizer) {

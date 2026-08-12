@@ -326,6 +326,12 @@ public final class tech/ssemaj/pipe/host/HostGate {
 	public final fun admit (Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
+public final class tech/ssemaj/pipe/host/PipeFullScreen {
+	public static final field INSTANCE Ltech/ssemaj/pipe/host/PipeFullScreen;
+	public final fun open (Landroidx/activity/ComponentActivity;Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/PipeAuthorizer;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lkotlinx/coroutines/Job;
+	public static synthetic fun open$default (Ltech/ssemaj/pipe/host/PipeFullScreen;Landroidx/activity/ComponentActivity;Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/PipeAuthorizer;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lkotlinx/coroutines/Job;
+}
+
 public abstract interface class tech/ssemaj/pipe/host/PipeSession {
 	public abstract fun close ()V
 	public abstract fun getMessages ()Lkotlinx/coroutines/flow/Flow;

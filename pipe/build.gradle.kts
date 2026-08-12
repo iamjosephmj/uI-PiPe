@@ -20,6 +20,7 @@ android {
 }
 
 dependencies {
+    api(libs.androidx.activity)
     implementation(libs.coroutines.android)
     implementation(libs.androidx.lifecycle.runtime)
     implementation("androidx.annotation:annotation:1.9.1")

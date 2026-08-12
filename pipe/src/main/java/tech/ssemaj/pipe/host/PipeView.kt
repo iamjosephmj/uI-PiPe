@@ -47,6 +47,7 @@ import tech.ssemaj.pipe.core.DenialSource
 import tech.ssemaj.pipe.core.PipeDeniedException
 import tech.ssemaj.pipe.core.PipeException
 import tech.ssemaj.pipe.core.PipeMessage
+import tech.ssemaj.pipe.core.PipePresentation
 import tech.ssemaj.pipe.core.PipeProviderUnavailableException
 import tech.ssemaj.pipe.core.PipeRequest
 import tech.ssemaj.pipe.core.PipeSize
@@ -99,13 +100,17 @@ class PipeView @JvmOverloads constructor(
     private val windowManager = context.getSystemService(WindowManager::class.java)
     private var embeddedInputToken: android.window.InputTransferToken? = null
     private var current: OpenAttempt? = null
+    @Volatile private var directInput = false
 
     init {
         // A regular SurfaceView does not forward touches into an embedded
         // SurfaceControlViewHost automatically; the host must hand each gesture off, on every
         // ACTION_DOWN, by transferring from its own input token to the embedded pane's token.
+        // Non-embedded (full-screen/dialog) panes skip this: the embedded surface is rendered on
+        // top via setZOrderOnTop and receives input directly, so it accepts repeated gestures
+        // without depending on per-gesture transfer.
         surfaceView.setOnTouchListener { _, event ->
-            if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            if (!directInput && event.actionMasked == MotionEvent.ACTION_DOWN) {
                 val embedded = embeddedInputToken
                 val hostToken = surfaceView.rootSurfaceControl?.inputTransferToken
                 if (embedded != null && hostToken != null) {
@@ -134,6 +139,10 @@ class PipeView @JvmOverloads constructor(
         authorizer: PipeAuthorizer = PipeAuthorizers.sameSigningKey(context),
         timeout: Duration = 10.seconds,
     ): PipeSession = withContext(dispatcher) {
+        if (request.presentation != PipePresentation.EMBEDDED) {
+            directInput = true
+            surfaceView.setZOrderOnTop(true)
+        }
         check(current == null) { "PipeView already has a live session; call close() first" }
         val deferred = CompletableDeferred<PipeSession>()
         val attempt = OpenAttempt(provider, request, deferred)
@@ -371,7 +380,10 @@ class PipeView @JvmOverloads constructor(
             closed = true
             if (bound) runCatching { context.unbindService(connection) }
             bound = false
-            if (current === this@OpenAttempt) { current = null; embeddedInputToken = null }
+            if (current === this@OpenAttempt) {
+                current = null; embeddedInputToken = null
+                directInput = false; surfaceView.setZOrderOnTop(false)
+            }
             deferred.completeExceptionally(ex)
         }
 
@@ -383,7 +395,10 @@ class PipeView @JvmOverloads constructor(
             bound = false
             remoteSession = null
             guestChannel = null
-            if (current === this@OpenAttempt) { current = null; embeddedInputToken = null }
+            if (current === this@OpenAttempt) {
+                current = null; embeddedInputToken = null
+                directInput = false; surfaceView.setZOrderOnTop(false)
+            }
             stateFlow.value = PipeState.Closed(cause)
             messageListeners.forEach { it.close() }
             messageListeners.clear()

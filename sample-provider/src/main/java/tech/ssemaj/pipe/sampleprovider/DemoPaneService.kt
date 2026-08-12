@@ -31,6 +31,8 @@ class DemoPaneService : PipeProviderService() {
     override suspend fun onOpenPane(request: PipeRequest, host: HostHandle): PaneResult {
         val themed = ContextThemeWrapper(this, R.style.Theme_PipeProvider)
         val presenter = PanePresenter()
+        var lastRequest: CertificationRequest? = null
+        val pad = if (request.presentation == tech.ssemaj.pipe.core.PipePresentation.DIALOG) 24 else 48
 
         fun text(value: String, sizeSp: Float = 14f, bold: Boolean = false) = TextView(themed).apply {
             this.text = value
@@ -58,12 +60,17 @@ class DemoPaneService : PipeProviderService() {
             addView(consentTitle); addView(consentFingerprint); addView(buttons)
         }
         val resultText = text("", 15f, bold = true).apply { visibility = View.GONE }
+        val startOver = MaterialButton(themed).apply {
+            text = "Start over"
+            visibility = View.GONE
+            setOnClickListener { lastRequest?.let(presenter::onRequest) }
+        }
         val root = LinearLayout(themed).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             setBackgroundColor(Color.WHITE)
-            setPadding(32, 32, 32, 32)
-            addView(title); addView(caption); addView(consentGroup); addView(resultText)
+            setPadding(pad, pad, pad, pad)
+            addView(title); addView(caption); addView(consentGroup); addView(resultText); addView(startOver)
         }
 
         // Render presenter state (paneScope is main-thread).
@@ -71,6 +78,9 @@ class DemoPaneService : PipeProviderService() {
             presenter.state.collect { state ->
                 consentGroup.visibility = if (state is PanePresenter.State.Consent) View.VISIBLE else View.GONE
                 resultText.visibility =
+                    if (state is PanePresenter.State.Issued || state is PanePresenter.State.Declined) View.VISIBLE
+                    else View.GONE
+                startOver.visibility =
                     if (state is PanePresenter.State.Issued || state is PanePresenter.State.Declined) View.VISIBLE
                     else View.GONE
                 when (state) {
@@ -104,7 +114,10 @@ class DemoPaneService : PipeProviderService() {
         return PaneResult.Content(object : PipeContent {
             override val view: View = root
             override fun onMessage(message: PipeMessage) {
-                PipeCodec.decodeOrNull<CertificationRequest>(message)?.let(presenter::onRequest)
+                PipeCodec.decodeOrNull<CertificationRequest>(message)?.let { req ->
+                    lastRequest = req
+                    presenter.onRequest(req)
+                }
             }
         })
     }

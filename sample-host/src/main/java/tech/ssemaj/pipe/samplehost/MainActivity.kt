@@ -32,6 +32,7 @@ class MainActivity : ComponentActivity() {
             }
             else -> PipeAuthorizers.sameSigningKey(this)
         }
+        viewModel.setProvider(provider)
         setContent {
             PipeDemoTheme {
                 val state by viewModel.uiState.collectAsState()
@@ -40,6 +41,7 @@ class MainActivity : ComponentActivity() {
                     onPaneViewCreated = { view -> viewModel.onPaneViewReady(view, provider, authorizer) },
                     onRequest = { viewModel.requestCertification(hostDisplayName = "Pipe Sample Host") },
                     onReopen = viewModel::reopen,
+                    onOpenFullScreen = { viewModel.openFullScreen(this@MainActivity) },
                 )
             }
         }
