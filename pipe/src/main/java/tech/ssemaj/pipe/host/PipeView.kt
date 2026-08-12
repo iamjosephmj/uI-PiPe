@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.AttributeSet
+import android.util.Log
 import android.view.MotionEvent
 import android.view.SurfaceControlViewHost.SurfacePackage
 import android.view.SurfaceView
@@ -33,6 +34,8 @@ import tech.ssemaj.pipe.transport.IOpenResultCallback
 import tech.ssemaj.pipe.transport.OpenSpec
 import tech.ssemaj.pipe.transport.Protocol
 
+private const val TAG = "PipeView"
+
 /** Embeds a verified provider's pane. Add to a layout, call [open]. */
 class PipeView @JvmOverloads constructor(
     context: Context,
@@ -52,14 +55,20 @@ class PipeView @JvmOverloads constructor(
 
     init {
         // A regular SurfaceView does not forward touches into an embedded
-        // SurfaceControlViewHost automatically; the host must hand the gesture off on first
-        // touch by transferring from its own input token to the embedded pane's token.
+        // SurfaceControlViewHost automatically; the host must hand each gesture off, on every
+        // ACTION_DOWN, by transferring from its own input token to the embedded pane's token.
         surfaceView.setOnTouchListener { _, event ->
             if (event.actionMasked == MotionEvent.ACTION_DOWN) {
                 val embedded = embeddedInputToken
                 val hostToken = surfaceView.rootSurfaceControl?.inputTransferToken
                 if (embedded != null && hostToken != null) {
                     runCatching { windowManager?.transferTouchGesture(hostToken, embedded) }
+                        .onSuccess { transferred ->
+                            if (transferred == false) {
+                                Log.w(TAG, "transferTouchGesture returned false; pane may not receive touch")
+                            }
+                        }
+                        .onFailure { t -> Log.w(TAG, "transferTouchGesture threw; pane may not receive touch", t) }
                 }
             }
             false
