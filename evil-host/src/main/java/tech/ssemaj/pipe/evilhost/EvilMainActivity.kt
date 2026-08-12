@@ -6,7 +6,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.os.bundleOf
 import tech.ssemaj.pipe.auth.AuthDecision
-import tech.ssemaj.pipe.auth.EmbedAuthorizer
+import tech.ssemaj.pipe.auth.PipeAuthorizer
 import tech.ssemaj.pipe.core.CloseReason
 import tech.ssemaj.pipe.core.PipeError
 import tech.ssemaj.pipe.core.PipeMessage
@@ -37,7 +37,7 @@ class EvilMainActivity : AppCompatActivity() {
             provider = provider,
             request = PipeRequest("demo.editor"),
             // Allow-all: this test isolates the PROVIDER-side gate, not the host's own policy.
-            authorizer = EmbedAuthorizer { _, _ -> AuthDecision.Allow },
+            authorizer = PipeAuthorizer { _, _ -> AuthDecision.Allow },
             callbacks = object : PipeHostCallbacks {
                 override fun onOpened(session: PipeSession) { status.text = "opened" }
                 override fun onMessage(message: PipeMessage) { status.text = "msg: ${message.payload.getString("text")}" }

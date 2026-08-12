@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import tech.ssemaj.pipe.auth.AuthDecision
-import tech.ssemaj.pipe.auth.EmbedAuthorizer
+import tech.ssemaj.pipe.auth.PipeAuthorizer
 import tech.ssemaj.pipe.auth.IdentityResolver
 import tech.ssemaj.pipe.auth.SigningSource
 import tech.ssemaj.pipe.core.PipeRequest
@@ -18,8 +18,8 @@ private class FakeSource(
     override fun certLineageSha256(packageName: String) = certs[packageName] ?: emptyList()
 }
 
-private val allowAll = EmbedAuthorizer { _, _ -> AuthDecision.Allow }
-private val denyAll = EmbedAuthorizer { _, _ -> AuthDecision.Deny("nope") }
+private val allowAll = PipeAuthorizer { _, _ -> AuthDecision.Allow }
+private val denyAll = PipeAuthorizer { _, _ -> AuthDecision.Deny("nope") }
 private val request = PipeRequest("pane")
 
 class ProviderGateTest {

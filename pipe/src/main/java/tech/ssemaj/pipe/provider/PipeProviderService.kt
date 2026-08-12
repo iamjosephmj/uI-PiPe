@@ -9,10 +9,10 @@ import android.os.IBinder
 import android.os.Looper
 import android.view.SurfaceControlViewHost
 import tech.ssemaj.pipe.auth.AndroidSigningSource
-import tech.ssemaj.pipe.auth.EmbedAuthorizer
-import tech.ssemaj.pipe.auth.EmbedAuthorizers
 import tech.ssemaj.pipe.auth.IdentityResolver
 import tech.ssemaj.pipe.auth.PeerIdentity
+import tech.ssemaj.pipe.auth.PipeAuthorizer
+import tech.ssemaj.pipe.auth.PipeAuthorizers
 import tech.ssemaj.pipe.channel.InboundSequencer
 import tech.ssemaj.pipe.channel.OutboundSequencer
 import tech.ssemaj.pipe.core.CloseReason
@@ -33,7 +33,7 @@ import tech.ssemaj.pipe.transport.Protocol
 abstract class PipeProviderService : Service() {
 
     /** Policy for who may embed this pane. Default: same signing key. */
-    open fun authorizer(): EmbedAuthorizer = EmbedAuthorizers.sameSigningKey(this)
+    open fun authorizer(): PipeAuthorizer = PipeAuthorizers.sameSigningKey(this)
 
     /** Build the pane. Called on the main thread after the caller passed the gate. */
     abstract fun onOpenPane(request: PipeRequest, host: HostHandle): PipeContent

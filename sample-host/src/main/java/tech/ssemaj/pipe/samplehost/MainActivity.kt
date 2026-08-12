@@ -5,7 +5,7 @@ import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.os.bundleOf
-import tech.ssemaj.pipe.auth.EmbedAuthorizers
+import tech.ssemaj.pipe.auth.PipeAuthorizers
 import tech.ssemaj.pipe.core.CloseReason
 import tech.ssemaj.pipe.core.PipeError
 import tech.ssemaj.pipe.core.PipeMessage
@@ -35,7 +35,7 @@ class MainActivity : AppCompatActivity() {
         session = pipeView.open(
             provider = provider,
             request = PipeRequest("demo.editor"),
-            authorizer = EmbedAuthorizers.sameSigningKey(this),
+            authorizer = PipeAuthorizers.sameSigningKey(this),
             callbacks = object : PipeHostCallbacks {
                 override fun onOpened(session: PipeSession) { status.text = "opened" }
                 override fun onMessage(message: PipeMessage) { status.text = "msg: ${message.payload.getString("text")}" }

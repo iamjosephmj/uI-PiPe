@@ -1,6 +1,6 @@
-public final class tech/ssemaj/pipe/auth/AllowlistAuthorizer : tech/ssemaj/pipe/auth/EmbedAuthorizer {
+public final class tech/ssemaj/pipe/auth/AllowlistAuthorizer : tech/ssemaj/pipe/auth/PipeAuthorizer {
 	public fun <init> (Ljava/util/Set;)V
-	public fun authorize (Ltech/ssemaj/pipe/auth/PeerIdentity;Ltech/ssemaj/pipe/core/PipeRequest;)Ltech/ssemaj/pipe/auth/AuthDecision;
+	public fun authorize (Ltech/ssemaj/pipe/auth/PeerIdentity;Ltech/ssemaj/pipe/core/PipeRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class tech/ssemaj/pipe/auth/AndroidSigningSource : tech/ssemaj/pipe/auth/SigningSource {
@@ -32,17 +32,7 @@ public final class tech/ssemaj/pipe/auth/AuthDecision$Deny : tech/ssemaj/pipe/au
 }
 
 public final class tech/ssemaj/pipe/auth/AuthorizersKt {
-	public static final fun anyOf ([Ltech/ssemaj/pipe/auth/EmbedAuthorizer;)Ltech/ssemaj/pipe/auth/EmbedAuthorizer;
-}
-
-public abstract interface class tech/ssemaj/pipe/auth/EmbedAuthorizer {
-	public abstract fun authorize (Ltech/ssemaj/pipe/auth/PeerIdentity;Ltech/ssemaj/pipe/core/PipeRequest;)Ltech/ssemaj/pipe/auth/AuthDecision;
-}
-
-public final class tech/ssemaj/pipe/auth/EmbedAuthorizers {
-	public static final field INSTANCE Ltech/ssemaj/pipe/auth/EmbedAuthorizers;
-	public final fun allowlist ([Ljava/lang/String;)Ltech/ssemaj/pipe/auth/EmbedAuthorizer;
-	public final fun sameSigningKey (Landroid/content/Context;)Ltech/ssemaj/pipe/auth/EmbedAuthorizer;
+	public static final fun anyOf ([Ltech/ssemaj/pipe/auth/PipeAuthorizer;)Ltech/ssemaj/pipe/auth/PipeAuthorizer;
 }
 
 public final class tech/ssemaj/pipe/auth/IdentityResolver {
@@ -68,9 +58,19 @@ public final class tech/ssemaj/pipe/auth/PeerIdentity {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class tech/ssemaj/pipe/auth/SameSigningKeyAuthorizer : tech/ssemaj/pipe/auth/EmbedAuthorizer {
+public abstract interface class tech/ssemaj/pipe/auth/PipeAuthorizer {
+	public abstract fun authorize (Ltech/ssemaj/pipe/auth/PeerIdentity;Ltech/ssemaj/pipe/core/PipeRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class tech/ssemaj/pipe/auth/PipeAuthorizers {
+	public static final field INSTANCE Ltech/ssemaj/pipe/auth/PipeAuthorizers;
+	public final fun allowlist ([Ljava/lang/String;)Ltech/ssemaj/pipe/auth/PipeAuthorizer;
+	public final fun sameSigningKey (Landroid/content/Context;)Ltech/ssemaj/pipe/auth/PipeAuthorizer;
+}
+
+public final class tech/ssemaj/pipe/auth/SameSigningKeyAuthorizer : tech/ssemaj/pipe/auth/PipeAuthorizer {
 	public fun <init> (Ljava/util/Set;)V
-	public fun authorize (Ltech/ssemaj/pipe/auth/PeerIdentity;Ltech/ssemaj/pipe/core/PipeRequest;)Ltech/ssemaj/pipe/auth/AuthDecision;
+	public fun authorize (Ltech/ssemaj/pipe/auth/PeerIdentity;Ltech/ssemaj/pipe/core/PipeRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public abstract interface class tech/ssemaj/pipe/auth/SigningSource {
@@ -288,7 +288,7 @@ public final class tech/ssemaj/pipe/core/PipeVersionMismatchException : tech/sse
 }
 
 public final class tech/ssemaj/pipe/host/HostGate {
-	public fun <init> (Ltech/ssemaj/pipe/auth/IdentityResolver;Ltech/ssemaj/pipe/auth/EmbedAuthorizer;)V
+	public fun <init> (Ltech/ssemaj/pipe/auth/IdentityResolver;Ltech/ssemaj/pipe/auth/PipeAuthorizer;)V
 	public final fun admit (Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;)Ltech/ssemaj/pipe/provider/GateResult;
 }
 
@@ -322,8 +322,8 @@ public final class tech/ssemaj/pipe/host/PipeView : android/widget/FrameLayout {
 	public fun <init> (Landroid/content/Context;Landroid/util/AttributeSet;)V
 	public synthetic fun <init> (Landroid/content/Context;Landroid/util/AttributeSet;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun closePane ()V
-	public final fun open (Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/EmbedAuthorizer;Ltech/ssemaj/pipe/host/PipeHostCallbacks;)Ltech/ssemaj/pipe/host/PipeSession;
-	public static synthetic fun open$default (Ltech/ssemaj/pipe/host/PipeView;Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/EmbedAuthorizer;Ltech/ssemaj/pipe/host/PipeHostCallbacks;ILjava/lang/Object;)Ltech/ssemaj/pipe/host/PipeSession;
+	public final fun open (Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/PipeAuthorizer;Ltech/ssemaj/pipe/host/PipeHostCallbacks;)Ltech/ssemaj/pipe/host/PipeSession;
+	public static synthetic fun open$default (Ltech/ssemaj/pipe/host/PipeView;Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/PipeAuthorizer;Ltech/ssemaj/pipe/host/PipeHostCallbacks;ILjava/lang/Object;)Ltech/ssemaj/pipe/host/PipeSession;
 }
 
 public final class tech/ssemaj/pipe/host/ProviderComponent {
@@ -396,14 +396,14 @@ public final class tech/ssemaj/pipe/provider/PipeContent$DefaultImpls {
 
 public abstract class tech/ssemaj/pipe/provider/PipeProviderService : android/app/Service {
 	public fun <init> ()V
-	public fun authorizer ()Ltech/ssemaj/pipe/auth/EmbedAuthorizer;
+	public fun authorizer ()Ltech/ssemaj/pipe/auth/PipeAuthorizer;
 	public final fun onBind (Landroid/content/Intent;)Landroid/os/IBinder;
 	public fun onDestroy ()V
 	public abstract fun onOpenPane (Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/provider/HostHandle;)Ltech/ssemaj/pipe/provider/PipeContent;
 }
 
 public final class tech/ssemaj/pipe/provider/ProviderGate {
-	public fun <init> (Ltech/ssemaj/pipe/auth/IdentityResolver;Ltech/ssemaj/pipe/auth/EmbedAuthorizer;)V
+	public fun <init> (Ltech/ssemaj/pipe/auth/IdentityResolver;Ltech/ssemaj/pipe/auth/PipeAuthorizer;)V
 	public final fun admit (ILtech/ssemaj/pipe/core/PipeRequest;I)Ltech/ssemaj/pipe/provider/GateResult;
 }
 

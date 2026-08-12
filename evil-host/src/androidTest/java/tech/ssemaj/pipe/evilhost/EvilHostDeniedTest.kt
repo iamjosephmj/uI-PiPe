@@ -16,7 +16,7 @@ private const val TIMEOUT = 10_000L
 /** Requires :sample-provider installed. The evil host's own gate would also deny; to prove the
  *  PROVIDER-side gate, the evil host passes an allow-all authorizer (its own policy is its business —
  *  the provider must still refuse it). In EvilMainActivity use:
- *  `authorizer = EmbedAuthorizer { _, _ -> AuthDecision.Allow }`. */
+ *  `authorizer = PipeAuthorizer { _, _ -> AuthDecision.Allow }`. */
 @RunWith(AndroidJUnit4::class)
 class EvilHostDeniedTest {
     private val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())

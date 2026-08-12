@@ -10,6 +10,7 @@ private class FakeSigningSource(
 ) : SigningSource {
     override fun packagesForUid(uid: Int) = uidToPackages[uid] ?: emptyList()
     override fun certLineageSha256(packageName: String) = packageToCerts[packageName] ?: emptyList()
+    override fun uidForPackage(packageName: String) = -1
 }
 
 class IdentityResolverTest {

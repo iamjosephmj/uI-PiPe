@@ -16,10 +16,10 @@ import android.view.SurfaceView
 import android.view.WindowManager
 import android.widget.FrameLayout
 import tech.ssemaj.pipe.auth.AndroidSigningSource
-import tech.ssemaj.pipe.auth.EmbedAuthorizer
-import tech.ssemaj.pipe.auth.EmbedAuthorizers
 import tech.ssemaj.pipe.auth.IdentityResolver
 import tech.ssemaj.pipe.auth.PeerIdentity
+import tech.ssemaj.pipe.auth.PipeAuthorizer
+import tech.ssemaj.pipe.auth.PipeAuthorizers
 import tech.ssemaj.pipe.channel.InboundSequencer
 import tech.ssemaj.pipe.channel.OutboundSequencer
 import tech.ssemaj.pipe.core.CloseReason
@@ -79,7 +79,7 @@ class PipeView @JvmOverloads constructor(
     fun open(
         provider: ProviderComponent,
         request: PipeRequest,
-        authorizer: EmbedAuthorizer = EmbedAuthorizers.sameSigningKey(context),
+        authorizer: PipeAuthorizer = PipeAuthorizers.sameSigningKey(context),
         callbacks: PipeHostCallbacks,
     ): PipeSession {
         closePane() // one pane per view
