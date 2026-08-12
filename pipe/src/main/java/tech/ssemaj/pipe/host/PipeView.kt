@@ -8,8 +8,10 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.AttributeSet
+import android.view.MotionEvent
 import android.view.SurfaceControlViewHost.SurfacePackage
 import android.view.SurfaceView
+import android.view.WindowManager
 import android.widget.FrameLayout
 import tech.ssemaj.pipe.auth.AndroidSigningSource
 import tech.ssemaj.pipe.auth.EmbedAuthorizer
@@ -38,10 +40,31 @@ class PipeView @JvmOverloads constructor(
 ) : FrameLayout(context, attrs) {
 
     private val surfaceView = SurfaceView(context).also {
+        // Host content stays visually on top; the embedded pane is composited beneath it and
+        // touch is handed over explicitly (see [embeddedInputToken]) rather than via Z order.
+        it.setZOrderOnTop(false)
         addView(it, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val windowManager = context.getSystemService(WindowManager::class.java)
+    private var embeddedInputToken: android.window.InputTransferToken? = null
     private var current: OpenAttempt? = null
+
+    init {
+        // A regular SurfaceView does not forward touches into an embedded
+        // SurfaceControlViewHost automatically; the host must hand the gesture off on first
+        // touch by transferring from its own input token to the embedded pane's token.
+        surfaceView.setOnTouchListener { _, event ->
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                val embedded = embeddedInputToken
+                val hostToken = surfaceView.rootSurfaceControl?.inputTransferToken
+                if (embedded != null && hostToken != null) {
+                    runCatching { windowManager?.transferTouchGesture(hostToken, embedded) }
+                }
+            }
+            false
+        }
+    }
 
     fun open(
         provider: ProviderComponent,
@@ -184,6 +207,7 @@ class PipeView @JvmOverloads constructor(
                     remoteSession = session
                     guestChannel = guest
                     surfaceView.setChildSurfacePackage(surfacePackage)
+                    embeddedInputToken = runCatching { surfacePackage.inputTransferToken }.getOrNull()
                     callbacks.onOpened(this@OpenAttempt.session)
                 }
             }
@@ -206,8 +230,8 @@ class PipeView @JvmOverloads constructor(
             bound = false
             remoteSession = null
             guestChannel = null
+            if (current === this) { current = null; embeddedInputToken = null }
             callbacks.onClosed(reason)
-            if (current === this) current = null
         }
     }
 }
