@@ -1,280 +1,294 @@
 # Pipe
 
-**Pipe** is an Android library that lets one app render a **live, fully-interactive UI inside another app's window** — cooperatively and with a cryptographic gate on both ends. A *host* app embeds a `PipeView` in its layout; a *provider* app renders a `View` into it, over the platform's `SurfaceControlViewHost` transport, with a two-way typed message channel between them. Both apps opt in, each verifies the other's signing identity, and the host controls placement, size, lifetime, and revocation — it deliberately does **not** rely on any window-token/overlay side channel, only the platform's sanctioned cross-process UI APIs.
+**Pipe** lets one Android app render a **live, fully interactive UI inside another app's window** — across a process boundary, with a cryptographic identity check on both ends. A *host* app places a pane in its layout; a *provider* app renders a `View` into it, in its **own process**, over the platform's `SurfaceControlViewHost` transport, with a two-way typed message channel between them.
 
-Status: **v2, implemented** — coroutine-first API, three presentation modes (embedded, full-screen, dialog), and opt-in typed messaging. Single core artifact, `:pipe` (namespace `tech.ssemaj.pipe`). Targets a **closed app family / vetted partners**, not an open marketplace.
+Both apps opt in, each verifies the other's signing identity before anything crosses, and the host controls placement, size, lifetime, and revocation. Pipe uses only the platform's sanctioned cross-process UI APIs — no window-token or draw-over side channel.
 
-> **New here?** Read [`ARCHITECTURE.md`](ARCHITECTURE.md) for how Pipe works — the process/threading model, the wire protocol, the trust model, and the presentation modes.
+The payoff is real isolation: the pane renders on the **provider's** main thread and heap, so host jank never stalls the pane and a provider crash can't take down the host — while a signing-identity gate keeps the two apps in distinct trust domains.
+
+Status: **v2, implemented.** Coroutine-first API, three presentation modes (embedded / full-screen / dialog), opt-in typed messaging. Targets a **closed app family / vetted partners**, not an open marketplace.
+
+> **How it works:** [`ARCHITECTURE.md`](ARCHITECTURE.md) covers the process/threading model, the wire protocol, the trust model, and the presentation modes in depth. This README is the task-level guide.
+
+## Contents
+
+- [Requirements](#requirements)
+- [Install](#install)
+- [Host quickstart](#host-quickstart)
+- [Provider quickstart](#provider-quickstart)
+- [Presentation modes](#presentation-modes)
+- [Trust & authorization](#trust--authorization)
+- [Typed messaging](#typed-messaging)
+- [Channel semantics](#channel-semantics)
+- [Discovery](#discovery)
+- [Security notes](#security-notes)
+- [Testing](#testing)
+- [Known limitations](#known-limitations)
 
 ## Requirements
 
 - **`minSdk = 35`** (Android 15) for both host and provider apps.
 
-  Clean cross-process input **and IME** delivery for a fully-interactive embedded pane requires `android.window.InputTransferToken`, which only exists from API 35. `PipeView` uses it both to hand its own input token to the provider (`OpenSpec.inputTransferToken`, built from `surfaceView.rootSurfaceControl.inputTransferToken`) and to transfer live touch gestures into the embedded pane on every `ACTION_DOWN` (`WindowManager.transferTouchGesture`). There is no lower-SDK degraded-input fallback in v1.
-- `compileSdk = 36`, Kotlin, `kotlinx-parcelize` (the wire types are `@Parcelize` classes).
-- The provider service must be `android:exported="true"` with the `tech.ssemaj.pipe.action.OPEN_PANE` intent-filter action (see below); no other exported surface is required.
+  Clean cross-process input **and IME** delivery requires `android.window.InputTransferToken`, which only exists from API 35. There is no lower-SDK degraded-input fallback.
+- `compileSdk = 36`, Kotlin, coroutines. The wire types are `@Parcelize` classes (`kotlin-parcelize`).
+- The provider service must be `android:exported="true"` with the `tech.ssemaj.pipe.action.OPEN_PANE` intent-filter action.
+
+## Install
+
+```kotlin
+dependencies {
+    implementation("tech.ssemaj.pipe:pipe:2.0.0-alpha01")
+    // Optional: typed (@Serializable) messages over the pipe.
+    implementation("tech.ssemaj.pipe:pipe-serialization:2.0.0-alpha01")
+}
+```
 
 ## Host quickstart
 
-Add a `PipeView` to your layout:
+Put a `PipeView` in your layout:
 
 ```xml
-<!-- res/layout/activity_main.xml -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
+<tech.ssemaj.pipe.host.PipeView
+    android:id="@+id/pipe_view"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
-
-    <TextView
-        android:id="@+id/host_status"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content" />
-
-    <tech.ssemaj.pipe.host.PipeView
-        android:id="@+id/pipe_view"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
-</LinearLayout>
+    android:layout_height="0dp"
+    android:layout_weight="1" />
 ```
 
-Open a pane and wire callbacks:
+Open a pane from a coroutine. `PipeView.open()` is `suspend`: it runs the gate + bind + handshake and returns a live `PipeSession`, or throws a `PipeException` (denied / timeout / transport). The session exposes `state` and `messages` as flows:
 
 ```kotlin
-import androidx.core.os.bundleOf
-import tech.ssemaj.pipe.auth.EmbedAuthorizers
-import tech.ssemaj.pipe.core.CloseReason
-import tech.ssemaj.pipe.core.PipeError
-import tech.ssemaj.pipe.core.PipeMessage
-import tech.ssemaj.pipe.core.PipeRequest
-import tech.ssemaj.pipe.host.PipeHostCallbacks
-import tech.ssemaj.pipe.host.PipeSession
-import tech.ssemaj.pipe.host.PipeView
-import tech.ssemaj.pipe.host.ProviderComponent
-
-class MainActivity : AppCompatActivity() {
-    private var session: PipeSession? = null
-
+class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        val status = findViewById<TextView>(R.id.host_status)
         val pipeView = findViewById<PipeView>(R.id.pipe_view)
 
         val provider = ProviderComponent(
-            packageName = "tech.ssemaj.pipe.sampleprovider",
-            serviceClass = "tech.ssemaj.pipe.sampleprovider.DemoPaneService",
+            packageName = "com.example.provider",
+            serviceClass = "com.example.provider.DemoPaneService",
         )
-        session = pipeView.open(
-            provider = provider,
-            request = PipeRequest("demo.editor"),
-            authorizer = EmbedAuthorizers.sameSigningKey(this),
-            callbacks = object : PipeHostCallbacks {
-                override fun onOpened(session: PipeSession) { status.text = "opened" }
-                override fun onMessage(message: PipeMessage) { status.text = "msg: ${message.payload.getString("text")}" }
-                override fun onDenied(reason: String) { status.text = "denied: $reason" }
-                override fun onError(error: PipeError) { status.text = "error: ${error.code}" }
-                override fun onClosed(reason: CloseReason) { status.text = "closed: $reason" }
-            },
-        )
-    }
 
-    fun sendHello() {
-        session?.send(PipeMessage(bundleOf("text" to "hello-from-host")))
+        lifecycleScope.launch {
+            try {
+                val session = pipeView.open(
+                    provider = provider,
+                    request = PipeRequest("demo.editor"),
+                    authorizer = PipeAuthorizers.sameSigningKey(this@MainActivity), // default
+                )
+                // Collect provider → host messages.
+                launch { session.messages.collect { onMessage(it) } }
+                // Observe lifecycle.
+                launch { session.state.collect { if (it is PipeState.Closed) finishFlow() } }
+                // Host → provider.
+                session.send(PipeMessage(bundleOf("text" to "hello-from-host")))
+            } catch (e: PipeDeniedException) {
+                // e.reason — the provider (or your own authorizer) refused.
+            } catch (e: PipeException) {
+                // timeout / transport / provider-died
+            }
+        }
     }
 }
 ```
 
-`PipeView.open()` returns a `PipeSession` immediately (`send`, `resize`, `close`, `peer`); the real gate/bind/open handshake runs asynchronously and reports back through `callbacks` on the main thread. Calling `open()` again on the same `PipeView` closes any existing pane first (one pane per view). Detaching the `PipeView` from the window also closes the pane.
+One pane per view: calling `open()` again while a session is live throws — `close()` first. Detaching the `PipeView` closes the pane. For a fire-and-forget variant that ties teardown to a `LifecycleOwner`, use `pipeView.openIn(owner, provider, request, onSession = { … }, onError = { … })`.
 
-Declare the provider(s) you intend to bind to in your `<queries>` block (required on API 30+ package-visibility rules):
+Declare the providers you bind in your `<queries>` block (API 30+ package-visibility):
 
 ```xml
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <queries>
-        <package android:name="tech.ssemaj.pipe.sampleprovider" />
-    </queries>
-    ...
-</manifest>
+<queries>
+    <package android:name="com.example.provider" />
+</queries>
 ```
 
 ## Provider quickstart
 
-Subclass `PipeProviderService` and build a `View` per open request:
+Subclass `PipeProviderService` and build a `View` per request. `onOpenPane` is `suspend` and runs on the provider's main thread (`paneScope`), only *after* the calling host passed the provider's gate. Return `PaneResult.Content(...)` or `PaneResult.Reject(reason)`:
 
 ```kotlin
-import androidx.core.os.bundleOf
-import tech.ssemaj.pipe.core.PipeMessage
-import tech.ssemaj.pipe.core.PipeRequest
-import tech.ssemaj.pipe.provider.HostHandle
-import tech.ssemaj.pipe.provider.PipeContent
-import tech.ssemaj.pipe.provider.PipeProviderService
-
 class DemoPaneService : PipeProviderService() {
 
-    override fun onOpenPane(request: PipeRequest, host: HostHandle): PipeContent {
-        val editText = EditText(this).apply { hint = "type here" }
+    override suspend fun onOpenPane(request: PipeRequest, host: HostHandle): PaneResult {
         val status = TextView(this).apply { text = "pane-ready" }
         val button = Button(this).apply {
-            text = "Ping Host"
+            text = "Ping host"
             setOnClickListener {
-                host.send(PipeMessage(bundleOf("type" to "ping", "text" to editText.text.toString())))
+                paneScope.launch {
+                    host.send(PipeMessage(bundleOf("text" to "pong")))
+                }
             }
         }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(status); addView(editText); addView(button)
+            addView(status); addView(button)
         }
-        return object : PipeContent {
+        return PaneResult.Content(object : PipeContent {
             override val view: View = root
             override fun onMessage(message: PipeMessage) {
                 status.text = message.payload.getString("text") ?: "(no text)"
             }
-        }
+        })
     }
 }
 ```
 
-`onOpenPane` runs on the main thread, only after the calling host has already passed the provider's gate (`ProviderGate` inside `PipeProviderService.onBind().open()`). Override `authorizer()` to change who may embed (default `EmbedAuthorizers.sameSigningKey(this)`). `PipeContent.onResized`/`onClosed` are optional (default no-ops); `PipeContent.view` is rendered by the library into a `SurfaceControlViewHost` sized to the host's requested `widthPx`/`heightPx`.
-
-Manifest declaration — the service **must** be exported with the `OPEN_PANE` action so hosts can bind it:
+Override `authorizer()` to change who may embed (default `PipeAuthorizers.sameSigningKey(this)`). `PipeContent.onResized` / `onClosed` are optional. Manifest:
 
 ```xml
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:label="My Pane Provider">
-        <service
-            android:name=".DemoPaneService"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="tech.ssemaj.pipe.action.OPEN_PANE" />
-            </intent-filter>
-        </service>
-        <!-- optional same-key defense-in-depth, see Security notes below -->
-        <!-- android:permission="tech.ssemaj.pipe.permission.BIND_PANE" -->
-    </application>
-</manifest>
+<service
+    android:name=".DemoPaneService"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="tech.ssemaj.pipe.action.OPEN_PANE" />
+    </intent-filter>
+    <!-- optional same-key OS pre-filter, see Security notes: -->
+    <!-- android:permission="tech.ssemaj.pipe.permission.BIND_PANE" -->
+</service>
 ```
 
-Any app that wants to bind this service must in turn declare it in a `<queries>` block (see Host quickstart above) — that's a platform package-visibility requirement, independent of Pipe's own gate.
+## Presentation modes
+
+The provider's `PaneResult.Content` is identical across modes; the **host** picks how the pane is shown, and the mode travels in `PipeRequest.presentation` so the provider *may* adapt its layout.
+
+```kotlin
+// Embedded (default): the PipeView in your layout, as above.
+
+// Full-screen: a full-bleed, inset-padded pane over your activity.
+PipeFullScreen.open(
+    activity = this,
+    provider = provider,
+    request = PipeRequest("demo.editor", presentation = PipePresentation.FULL_SCREEN),
+    onSession = { session -> /* … */ },
+)
+
+// Dialog: a dimmed scrim + centered card; dismiss (scrim/back) closes the session.
+PipeDialog.show(
+    activity = this,
+    provider = provider,
+    request = PipeRequest("demo.editor", presentation = PipePresentation.DIALOG),
+    onSession = { session -> /* … */ },
+)
+```
+
+Full-screen and dialog panes take input directly and support **repeated** gestures. Embedded panes have a one-interaction-per-session limitation — see [Known limitations](#known-limitations).
 
 ## Trust & authorization
 
-Every open is a **mutual** gate; identity is always cryptographic and kernel-backed, never a self-reported package name.
-
-```
- Host                                              Provider
-  │  1. resolve ComponentName, read its signing     │
-  │     certs from PackageManager                   │
-  │  2. hostAuthorizer.authorize(providerPeer, req)  │
-  │       Deny ──────────────────────► onDenied, no bind
-  │       Allow                                      │
-  │  3. bind() the *exact* ComponentName just        │
-  │     verified (no TOCTOU)                         │
-  │────────────── bindService ──────────────────────►│
-  │  4. open(spec, hostChannel, callback)             │
-  │───────────────── open() ─────────────────────────►│  5. Binder.getCallingUid() (kernel-enforced,
-  │                                                    │     unspoofable) → packages → signing certs
-  │                                                    │  6. providerAuthorizer.authorize(hostPeer, req)
-  │                                                    │       Deny ──► onDenied(reason), no SCVH built
-  │                                                    │       Allow
-  │                                                    │  7. onOpenPane(...) → SurfaceControlViewHost
-  │◄──────── SurfacePackage + session + channel ──────│
-  │  8. attach SurfacePackage, wire touch transfer     │
-```
-
-Both sides supply their own `EmbedAuthorizer`; policies may be asymmetric (e.g. host trusts a broad partner allowlist, provider only trusts its own signing key).
+Every open is a **mutual** gate, and identity is always cryptographic and kernel-backed — never a self-reported package name. The provider derives the host's identity from `Binder.getCallingUid()`; the host derives the provider's from the exact `ComponentName` it is about to bind. A `PipeAuthorizer` only ever sees the verified `PeerIdentity` the library built:
 
 ```kotlin
-fun interface EmbedAuthorizer {
-    fun authorize(peer: PeerIdentity, request: PipeRequest): AuthDecision
-}
-sealed interface AuthDecision {
-    data object Allow : AuthDecision
-    data class Deny(val reason: String) : AuthDecision
+fun interface PipeAuthorizer {
+    suspend fun authorize(peer: PeerIdentity, request: PipeRequest): AuthDecision  // Allow | Deny(reason)
 }
 data class PeerIdentity(val uid: Int, val packages: List<String>, val signingCertSha256: List<String>)
 ```
 
-Built-in authorizers (`tech.ssemaj.pipe.auth`):
+`authorize` is `suspend`, so a policy may consult a backend, an attestation check, or a consent prompt before deciding. Built-ins (`PipeAuthorizers`):
 
 ```kotlin
-// Trust anyone signed with (any cert in the rotation lineage of) *this* app's own key.
-EmbedAuthorizers.sameSigningKey(context)   // -> EmbedAuthorizer
-
-// Trust a fixed set of partner certs.
-EmbedAuthorizers.allowlist("aa11...sha256...", "bb22...sha256...")   // -> EmbedAuthorizer
-
-// Combine: allow if any delegate allows; Deny reasons are joined with "; ".
-val authorizer = anyOf(EmbedAuthorizers.sameSigningKey(context), EmbedAuthorizers.allowlist(partnerCertSha256))
+PipeAuthorizers.sameSigningKey(context)              // only peers signed with this app's own key (default)
+PipeAuthorizers.allowlist("aa11…sha256…", "bb22…")   // specific partner signing certs
+anyOf(PipeAuthorizers.sameSigningKey(context), PipeAuthorizers.allowlist(partnerCert))  // compose
 ```
 
-To compute a partner's cert SHA-256 for an allowlist, run either:
+Compute a partner's signing-cert SHA-256 for an allowlist:
 
 ```bash
-keytool -printcert -jarfile app.apk
-# or, for the app's signing key rather than the built APK:
-apksigner verify --print-certs app.apk
+keytool -printcert -jarfile app.apk          # cert in the APK
+apksigner verify --print-certs app.apk       # the app's signing key
 ```
 
-Both print a `SHA-256` fingerprint per signer; lowercase it (colons optional either way — `AllowlistAuthorizer`/`SameSigningKeyAuthorizer` lowercase before comparing) and pass it to `EmbedAuthorizers.allowlist(...)`.
-
-A custom authorizer is just another implementation — nothing special is required:
+Lowercase the printed `SHA-256` (colons optional; the built-ins normalize before comparing). A custom policy is just another `PipeAuthorizer`:
 
 ```kotlin
-class RiskScoringAuthorizer(private val trustedUids: Set<Int>) : EmbedAuthorizer {
-    override fun authorize(peer: PeerIdentity, request: PipeRequest): AuthDecision =
-        if (peer.uid in trustedUids) AuthDecision.Allow
-        else AuthDecision.Deny("uid ${peer.uid} not in trusted set")
+val authorizer = PipeAuthorizer { peer, request ->
+    if (peer.uid in trustedUids) AuthDecision.Allow
+    else AuthDecision.Deny("uid ${peer.uid} not trusted")
 }
 ```
 
-`PeerIdentity` is built **only** by the library — from a binder uid (provider side, via `Binder.getCallingUid()`) or a resolved `ComponentName` (host side, via `PackageManager`) — never from anything the peer sends. An `EmbedAuthorizer` never touches `PackageManager` or a self-reported name; it only sees the verified `PeerIdentity` the gate hands it.
+## Typed messaging
 
-## Channel
-
-Once a pane is open, both sides get a two-way message pipe. `PipeMessage` is the wire envelope:
+`:pipe-serialization` layers `@Serializable` messages over the raw channel with CBOR, no transport change. Put the contract in a module both apps share:
 
 ```kotlin
-data class PipeMessage(
-    val payload: Bundle,
-    val schemaVersion: Int = 1,
-    val seq: Long = UNSET_SEQ,   // UNSET_SEQ = -1L
-) : Parcelable
+@Serializable sealed interface DemoMessage {
+    @Serializable data class Ping(val text: String) : DemoMessage
+    @Serializable data class Pong(val text: String) : DemoMessage
+}
 ```
 
-- `payload` is a plain `Bundle` — apps own their own schema inside it (see `bundleOf("text" to ..., "type" to ...)` in the quickstarts above).
-- `schemaVersion` is app-owned; the library does not interpret it.
-- `seq` is **library-owned**: leave it `UNSET_SEQ` when constructing a message to send. `PipeSession.send()` / `HostHandle.send()` stamp it via an internal `OutboundSequencer` before it crosses the binder; the receiving side's `InboundSequencer` uses it to guarantee ordered, gap-free delivery and drops/logs out-of-order or duplicate messages rather than delivering them to `onMessage`.
-- Delivery is ordered per-direction (host→provider and provider→host are independent streams), but not synchronous — `send()` returns immediately.
+Send and collect by type:
+
+```kotlin
+// Host                                    // Provider
+session.send<DemoMessage>(Ping("hi"))      host.send<DemoMessage>(Pong("hi back"))
+session.messagesOf<DemoMessage>()          // Flow<DemoMessage>
+    .collect { … }
+```
+
+Send sealed hierarchies as the **supertype** (`send<DemoMessage>(…)`), not the concrete subtype — the codec matches on the exact qualified name.
+
+## Channel semantics
+
+Once a pane is open, both directions carry `PipeMessage`s:
+
+```kotlin
+PipeMessage(payload: Bundle, schemaVersion: Int = 1)   // seq is library-owned, not part of the public ctor
+```
+
+- `payload` is a plain `Bundle`; your app owns the schema inside it (or use typed messaging above).
+- Host→provider and provider→host are **independent** streams, each stamped with a monotonic sequence internally.
+- Delivery is **ordered** and **de-duplicated** (a regressed/repeated message is dropped), and **gap-tolerant** — the sender may skip sequence numbers and the receiver accepts forward jumps. It is at-most-once and in order, **not** gap-free.
+- `send()` is `suspend` and returns a `Boolean` (false if the peer is already gone); it does not block on delivery.
+
+## Discovery
+
+To find installed providers for a pane action instead of hard-coding a `ProviderComponent`:
+
+```kotlin
+val providers: List<ProviderDescriptor> =
+    PipeDiscovery.query(context, action = Pipe.ACTION_OPEN_PANE)
+// each: component, packageName, label, certSha256 — apply your own authorizer to choose.
+```
 
 ## Security notes
 
-- **Identity is never a claimed package name.** The provider trusts only `Binder.getCallingUid()` (kernel-enforced, unspoofable) mapped through `PackageManager.getPackagesForUid()`/signing certs; the host trusts only the `ComponentName` it explicitly resolved and verified *before* binding — verified is bound, so there's no TOCTOU window between "checked" and "used".
-- **Shared UID callers:** if a calling uid maps to more than one package (`android:sharedUserId`), `IdentityResolver.forUid` builds `PeerIdentity.signingCertSha256` as the **union** of every package's cert lineage under that uid, and the built-in authorizers (`sameSigningKey`, `allowlist`) admit if **any** cert in that union matches — same as the single-package case. The gate is fail-closed on *readability*, not on per-package trust: if any package under the uid can't be attributed a signing lineage, `forUid` returns `null` and the whole peer is refused. A stricter "every package under this uid must individually be trusted" policy is not the built-in behavior — it can be implemented as a custom `EmbedAuthorizer` that inspects `PeerIdentity.packages`/`signingCertSha256` itself.
-- **The exported provider service checks first.** `PipeProviderService.onBind().open()` runs the cert-check gate as the very first thing inside the AIDL entry point; an unauthorized caller gets `onDenied`/`onError` and nothing else — no `SurfaceControlViewHost` is ever constructed for a denied caller.
-- **Denial is terminal.** For a caller/provider that's denied (or errored) before a pane ever opened, only `onDenied`/`onError` fires — there is no trailing `onClosed`, since nothing was ever opened to close.
-- **Optional defense-in-depth:** a provider that only ever expects same-signing-key hosts can additionally set `android:permission="tech.ssemaj.pipe.permission.BIND_PANE"` on its `<service>` and require/declare that signature-level permission — this is a cheap OS-level pre-filter *in addition to* the cert-hash gate, not a replacement for it (allowlist/partner-cert setups still rely on the gate, since the permission model can't express "any of these N certs").
-- **`security/evil.keystore` is a test fixture, not a release key.** It's a throwaway debug-signing key committed to this repo solely so `:evil-host`/`:evil-provider` can be built and installed with a signing identity that is guaranteed to differ from `:sample-host`/`:sample-provider`, to exercise the deny paths end-to-end. Never reuse it, and never ship an app signed with it.
+- **Identity is never a claimed package name.** The provider trusts only `Binder.getCallingUid()` (kernel-enforced) mapped through `PackageManager`; the host trusts only the `ComponentName` it resolved and verified *before* binding — verified-is-bound, so there's no TOCTOU window.
+- **Both gates run before anything expensive.** The host authorizes the provider before it binds; the provider runs its gate as the first thing inside the AIDL entry point — a denied caller gets `onDenied`/`onError` and **no** `SurfaceControlViewHost` is ever built. Denial is terminal (no trailing close).
+- **Live sessions stay UID-gated.** After open, every inbound binder call (`send`/`resize`/`close`/`onClosed`) is re-checked against the admitted UID on both sides, so a leaked binder handle can't drive the session from another UID.
+- **Shared-UID callers:** if a UID maps to multiple packages (`android:sharedUserId`), `PeerIdentity.signingCertSha256` is the **union** of every package's cert lineage, and the built-ins admit if **any** cert matches. The gate is fail-closed on *readability*: if any package under the UID can't be attributed a signing lineage, the whole peer is refused. A stricter per-package policy can be a custom `PipeAuthorizer`.
+- **Optional OS pre-filter:** a same-key-only provider can also set `android:permission="tech.ssemaj.pipe.permission.BIND_PANE"` (signature-level) on its `<service>` — a cheap pre-filter *in addition to* the cert gate, not a replacement (allowlist setups still rely on the gate).
+- **`security/evil.keystore` is a test fixture, not a release key.** It's a throwaway debug key committed solely so `:evil-host`/`:evil-provider` can be signed with an identity guaranteed to differ from the sample apps, to exercise the deny paths. Never reuse or ship it.
 
 ## Testing
 
-Unit tests (authorizer logic, gate logic, message sequencing, core types) live under `pipe/src/test`:
+Unit tests (authorizer/gate logic, sequencing, core types, cert-chain verification):
 
 ```bash
 ./gradlew :pipe:testDebugUnitTest
 ```
 
-End-to-end and security instrumented tests run on-device (`sample-host` + `sample-provider` for the happy path and mutual-gate assertions; `evil-host` + `evil-provider`, signed with `security/evil.keystore`, for the deny-in-both-directions security suite). Install all four sample/evil APKs, then run the connected suites:
+End-to-end and security tests run on-device. Install the sample + evil apps, then run the connected suites:
 
 ```bash
-./gradlew :sample-provider:installDebug :sample-host:installDebug :evil-provider:installDebug :evil-host:installDebug
+./gradlew :sample-provider:installDebug :sample-host:installDebug \
+          :evil-provider:installDebug :evil-host:installDebug
 ./gradlew :sample-host:connectedDebugAndroidTest :evil-host:connectedDebugAndroidTest
 ```
 
-`sample-host`'s suite covers pane render, touch + IME interactivity, channel round-trips both ways, and clean teardown, plus a security test proving the host denies an evil provider (no surface, no bind). `evil-host`'s suite proves the provider denies an evil host (with an allow-all host-side authorizer, so only the provider's gate is under test) even though the evil host's own authorization policy would have let it through.
+`sample-host` covers pane render, cross-process touch, both-direction channels, teardown, the three presentation modes, and reopen/multi-pane — plus a security test proving the host denies an evil provider (no surface, no bind). `evil-host` proves the provider denies an evil host even when the host's own policy would allow it.
 
-A full build (all six modules, including the evil ones) is:
+Full build of all modules:
 
 ```bash
 ./gradlew build
 ```
+
+## Known limitations
+
+- **`minSdk = 35`** — a deliberately high floor (the input model depends on API 35 `InputTransferToken`).
+- **Embedded single-gesture-per-session** — an embedded pane reliably receives only the *first* interactive gesture of a session; treat an embedded session as single-interaction and reopen for the next (the sample host demonstrates this). Full-screen and dialog modes are unaffected.
+- **Coarse-grained by design** — every message is a binder transaction; Pipe suits pane-render + occasional messages, not high-frequency small-message loops.
+- **Alpha** — a coherent, adversarially-tested alpha, not yet a hardened release.
