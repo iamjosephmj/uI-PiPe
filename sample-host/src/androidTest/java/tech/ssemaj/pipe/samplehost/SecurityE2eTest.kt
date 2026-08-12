@@ -31,6 +31,9 @@ class SecurityE2eTest {
         // No bind happened: the evil provider process must not be running.
         val ps = InstrumentationRegistry.getInstrumentation().uiAutomation
             .executeShellCommand("pidof tech.ssemaj.pipe.evilprovider")
-        ps.use { assertTrue(it.statSize <= 0 || java.io.FileInputStream(it.fileDescriptor).readBytes().isEmpty()) }
+        ps.use {
+            assertTrue("evil provider process is running — bind happened",
+                java.io.FileInputStream(it.fileDescriptor).readBytes().decodeToString().isBlank())
+        }
     }
 }
