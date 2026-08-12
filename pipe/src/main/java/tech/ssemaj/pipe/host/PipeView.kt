@@ -55,8 +55,15 @@ class PipeView @JvmOverloads constructor(
 
         val gate = HostGate(IdentityResolver(AndroidSigningSource(context)), authorizer)
         when (val result = gate.admit(provider, request)) {
-            is GateResult.Refused -> { mainHandler.post { callbacks.onDenied(result.reason) }; return attempt.session }
+            is GateResult.Refused -> {
+                current = null
+                attempt.closed = true
+                mainHandler.post { callbacks.onDenied(result.reason) }
+                return attempt.session
+            }
             is GateResult.Failed -> {
+                current = null
+                attempt.closed = true
                 mainHandler.post { callbacks.onError(PipeError(PipeError.Code.PROVIDER_NOT_FOUND, result.message)) }
                 return attempt.session
             }
@@ -97,7 +104,7 @@ class PipeView @JvmOverloads constructor(
         var remoteSession: IEmbedSession? = null
         private var guestChannel: IGuestChannel? = null
         private var bound = false
-        private var closed = false
+        internal var closed = false
         private val outbound = OutboundSequencer()
         private val inbound = InboundSequencer()
 
@@ -127,6 +134,7 @@ class PipeView @JvmOverloads constructor(
             val intent = Intent("tech.ssemaj.pipe.action.OPEN_PANE").setComponent(provider.toComponentName())
             bound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
             if (!bound) {
+                runCatching { context.unbindService(connection) }
                 mainHandler.post {
                     callbacks.onError(PipeError(PipeError.Code.PROVIDER_NOT_FOUND, "bindService returned false"))
                 }

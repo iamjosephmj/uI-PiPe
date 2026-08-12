@@ -7,5 +7,5 @@ import tech.ssemaj.pipe.transport.IOpenResultCallback;
 interface IEmbedProvider {
     int protocolVersion();
     /** Async: result (surface or denial) arrives on [callback]. Caller identity = Binder.getCallingUid(). */
-    void open(in OpenSpec spec, IHostChannel hostChannel, IOpenResultCallback callback);
+    oneway void open(in OpenSpec spec, IHostChannel hostChannel, IOpenResultCallback callback);
 }
