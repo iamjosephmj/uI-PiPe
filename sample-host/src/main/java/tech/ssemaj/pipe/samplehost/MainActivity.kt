@@ -42,6 +42,7 @@ class MainActivity : ComponentActivity() {
                     onRequest = { viewModel.requestCertification(hostDisplayName = "Pipe Sample Host") },
                     onReopen = viewModel::reopen,
                     onOpenFullScreen = { viewModel.openFullScreen(this@MainActivity) },
+                    onOpenDialog = { viewModel.openDialog(this@MainActivity) },
                 )
             }
         }

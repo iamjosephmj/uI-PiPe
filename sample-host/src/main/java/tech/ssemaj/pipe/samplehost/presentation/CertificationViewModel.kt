@@ -48,6 +48,22 @@ class CertificationViewModel(
         )
     }
 
+    fun openDialog(activity: androidx.activity.ComponentActivity) {
+        val provider = provider ?: return
+        tech.ssemaj.pipe.host.PipeDialog.show(
+            activity = activity,
+            provider = provider,
+            request = tech.ssemaj.pipe.core.PipeRequest(
+                tech.ssemaj.pipe.samples.contract.ACTION_CERTIFICATION,
+                presentation = tech.ssemaj.pipe.core.PipePresentation.DIALOG,
+            ),
+            onSession = { session ->
+                // Drive the flow: send the request so the pane shows consent immediately.
+                viewModelScope.launch { container.requestCertification(session, "Pipe Sample Host") }
+            },
+        )
+    }
+
     /** Called from the AndroidView factory each time a pane view is (re)created. */
     fun onPaneViewReady(view: PipeView, provider: ProviderComponent, authorizer: PipeAuthorizer) {
         _uiState.update { it.copy(pipeStatus = PipeStatus.CONNECTING, phase = FlowPhase.Idle) }

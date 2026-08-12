@@ -46,6 +46,7 @@ fun CertificationScreen(
     onRequest: () -> Unit,
     onReopen: () -> Unit,
     onOpenFullScreen: () -> Unit = {},
+    onOpenDialog: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -80,10 +81,19 @@ fun CertificationScreen(
                 enabled = state.pipeStatus == PipeStatus.CONNECTED && !inFlight,
                 modifier = Modifier.fillMaxWidth(),
             ) { Text(if (terminal) "Certify again" else "Request certification") }
-            OutlinedButton(
-                onClick = onOpenFullScreen,
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Full-screen") }
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = onOpenFullScreen,
+                    modifier = Modifier.weight(1f),
+                ) { Text("Full-screen") }
+                OutlinedButton(
+                    onClick = onOpenDialog,
+                    modifier = Modifier.weight(1f),
+                ) { Text("Dialog") }
+            }
             PhaseCard(state.phase)
         }
     }

@@ -326,6 +326,17 @@ public final class tech/ssemaj/pipe/host/HostGate {
 	public final fun admit (Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
+public final class tech/ssemaj/pipe/host/PipeDialog {
+	public static final field Companion Ltech/ssemaj/pipe/host/PipeDialog$Companion;
+	public synthetic fun <init> (Landroid/view/ViewGroup;Landroidx/activity/OnBackPressedCallback;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun dismiss ()V
+}
+
+public final class tech/ssemaj/pipe/host/PipeDialog$Companion {
+	public final fun show (Landroidx/activity/ComponentActivity;Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/PipeAuthorizer;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;)Ltech/ssemaj/pipe/host/PipeDialog;
+	public static synthetic fun show$default (Ltech/ssemaj/pipe/host/PipeDialog$Companion;Landroidx/activity/ComponentActivity;Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/PipeAuthorizer;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Ltech/ssemaj/pipe/host/PipeDialog;
+}
+
 public final class tech/ssemaj/pipe/host/PipeFullScreen {
 	public static final field INSTANCE Ltech/ssemaj/pipe/host/PipeFullScreen;
 	public final fun open (Landroidx/activity/ComponentActivity;Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/PipeAuthorizer;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lkotlinx/coroutines/Job;
