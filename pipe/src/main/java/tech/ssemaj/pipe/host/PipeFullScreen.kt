@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import tech.ssemaj.pipe.auth.PipeAuthorizer
 import tech.ssemaj.pipe.auth.PipeAuthorizers
@@ -63,9 +64,8 @@ object PipeFullScreen {
                 // The session can end other ways than back-press (host-initiated close, provider
                 // close, peer death) — tear the container down then too, so it never leaks.
                 activity.lifecycleScope.launch {
-                    session.state.collect { s ->
-                        if (s is PipeState.Closed) remove(root, container, backCallback)
-                    }
+                    session.state.first { it is PipeState.Closed }
+                    remove(root, container, backCallback)
                 }
                 onSession(session)
             },

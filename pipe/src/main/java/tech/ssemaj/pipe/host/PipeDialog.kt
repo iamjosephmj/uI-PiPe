@@ -9,6 +9,7 @@ import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import tech.ssemaj.pipe.auth.PipeAuthorizer
 import tech.ssemaj.pipe.auth.PipeAuthorizers
@@ -109,9 +110,8 @@ class PipeDialog private constructor(
                     // The session can end other ways than scrim/back (host-initiated close,
                     // provider close, peer death) — tear the overlay down then too.
                     activity.lifecycleScope.launch {
-                        session.state.collect { s ->
-                            if (s is PipeState.Closed) handle.dismiss()
-                        }
+                        session.state.first { it is PipeState.Closed }
+                        handle.dismiss()
                     }
                     onSession(session)
                 },

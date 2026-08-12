@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -182,16 +183,26 @@ class PipeView @JvmOverloads constructor(
         onError: (PipeException) -> Unit = {},
         onSession: (PipeSession) -> Unit = {},
     ): Job {
-        owner.lifecycle.addObserver(object : DefaultLifecycleObserver {
+        val observer = object : DefaultLifecycleObserver {
             override fun onDestroy(owner: LifecycleOwner) {
                 close()
             }
-        })
+        }
+        owner.lifecycle.addObserver(observer)
         return owner.lifecycleScope.launch {
             try {
                 val session = open(provider, request, authorizer)
+                // Drop the ON_DESTROY observer as soon as the session closes on its own, so it
+                // doesn't sit on owner.lifecycle (retaining this PipeView) until activity destroy.
+                // A separate lifecycle-scoped coroutine so it doesn't delay this Job's completion
+                // (which callers observe as "open() finished, onSession/onError delivered").
+                owner.lifecycleScope.launch {
+                    session.state.first { it is PipeState.Closed }
+                    owner.lifecycle.removeObserver(observer)
+                }
                 onSession(session)
             } catch (e: PipeException) {
+                owner.lifecycle.removeObserver(observer)
                 onError(e)
             }
         }
