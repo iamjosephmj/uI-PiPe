@@ -28,8 +28,14 @@ object PipeFullScreen {
     ): Job {
         val root = activity.findViewById<ViewGroup>(android.R.id.content)
         val pipeView = PipeView(activity)
+        pipeView.setOnApplyWindowInsetsListener { v, insets ->
+            val bars = insets.getInsets(android.view.WindowInsets.Type.systemBars())
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
+        }
         root.addView(pipeView, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+        pipeView.requestApplyInsets()
 
         val backCallback = object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
