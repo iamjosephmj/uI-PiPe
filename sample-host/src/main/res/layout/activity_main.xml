@@ -1,0 +1,20 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <TextView
+        android:id="@+id/host_status"
+        android:text="host-idle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+    <Button
+        android:id="@+id/send_button"
+        android:text="Send To Pane"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+    <tech.ssemaj.pipe.host.PipeView
+        android:id="@+id/pipe_view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+</LinearLayout>

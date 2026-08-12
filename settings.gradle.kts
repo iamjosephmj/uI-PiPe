@@ -8,3 +8,4 @@ dependencyResolutionManagement {
 rootProject.name = "pipe"
 include(":pipe")
 include(":sample-provider")
+include(":sample-host")
