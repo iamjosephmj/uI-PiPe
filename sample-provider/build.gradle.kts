@@ -12,6 +12,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -22,7 +23,14 @@ android {
 
 dependencies {
     implementation(project(":pipe"))
-    implementation(libs.appcompat)
+    implementation(project(":pipe-serialization"))
+    implementation(project(":sample-contract"))
     implementation(libs.coroutines.android)
     implementation(libs.androidx.lifecycle.runtime)
+    implementation(libs.material.components)
+    implementation(libs.kotlinx.serialization.cbor)
+    testImplementation(libs.junit)
+    testImplementation(libs.coroutines.test)
+    androidTestImplementation(libs.androidx.test.ext)
+    androidTestImplementation(libs.androidx.test.runner)
 }
