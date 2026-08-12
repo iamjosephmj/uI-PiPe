@@ -35,6 +35,8 @@ android {
 dependencies {
     implementation(project(":pipe"))
     implementation(libs.appcompat)
+    implementation(libs.coroutines.android)
+    implementation(libs.androidx.lifecycle.runtime)
     androidTestImplementation(libs.androidx.test.ext)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.espresso.core)

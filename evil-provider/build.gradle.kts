@@ -34,4 +34,5 @@ android {
 dependencies {
     implementation(project(":pipe"))
     implementation(libs.appcompat)
+    implementation(libs.coroutines.android)
 }
