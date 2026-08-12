@@ -226,6 +226,7 @@ class PipeView @JvmOverloads constructor(
             override val peer: PeerIdentity get() = checkNotNull(verifiedPeer) { "session not open" }
             override val state = stateFlow.asStateFlow()
             override val messages: Flow<PipeMessage> = callbackFlow {
+                if (closed) { close(); return@callbackFlow }
                 messageListeners += channel
                 awaitClose { messageListeners -= channel }
             }
@@ -242,14 +243,14 @@ class PipeView @JvmOverloads constructor(
                 val remote = IEmbedProvider.Stub.asInterface(binder)
                 runCatching {
                     binder.linkToDeath(
-                        { mainHandler.post { close(CloseReason.PEER_DIED, notifyProvider = false, cause = PipeTransportException("provider process died")) } },
+                        { mainHandler.post { providerGone(PipeTransportException("provider process died")) } },
                         0,
                     )
                 }
                 whenAttached { sendOpen(remote) }
             }
             override fun onServiceDisconnected(name: ComponentName) {
-                mainHandler.post { close(CloseReason.PEER_DIED, notifyProvider = false, cause = PipeTransportException("provider service disconnected")) }
+                mainHandler.post { providerGone(PipeTransportException("provider service disconnected")) }
             }
         }
 
@@ -305,7 +306,14 @@ class PipeView @JvmOverloads constructor(
             }
             override fun onClosed(closeReasonWire: Int) {
                 if (callerUidMismatch()) return
-                mainHandler.post { close(CloseReason.fromWire(closeReasonWire), notifyProvider = false) }
+                mainHandler.post {
+                    val reason = CloseReason.fromWire(closeReasonWire)
+                    if (remoteSession == null) {
+                        terminate(PipeTransportException("provider closed before open (reason=$reason)"))
+                    } else {
+                        close(reason, notifyProvider = false)
+                    }
+                }
             }
         }
 
@@ -340,6 +348,20 @@ class PipeView @JvmOverloads constructor(
          * released and the session's [PipeState] reflects [ex] as the closing cause. In that case
          * [deferred] is already completed (successfully) and this is a no-op for it.
          */
+        /**
+         * The provider process/connection is gone (binder death, service disconnect). Pre-open
+         * this is a failed attempt ([terminate]); post-open it's an unexpected close of a live
+         * session, reported with the accurate [CloseReason.PEER_DIED] rather than the generic
+         * reason [terminate] would apply.
+         */
+        fun providerGone(ex: PipeTransportException) {
+            if (remoteSession == null) {
+                terminate(ex)
+            } else {
+                close(CloseReason.PEER_DIED, notifyProvider = false, cause = ex)
+            }
+        }
+
         fun terminate(ex: PipeException) {
             if (closed) return
             if (remoteSession != null) {
