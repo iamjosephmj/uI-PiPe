@@ -16,7 +16,7 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     publishing { singleVariant("release") { withSourcesJar(); withJavadocJar() } }
-    testOptions { unitTests { isReturnDefaultValues = true } }
+    testOptions { unitTests { isReturnDefaultValues = true; isIncludeAndroidResources = true } }
 }
 
 dependencies {
@@ -25,6 +25,8 @@ dependencies {
     implementation("androidx.annotation:annotation:1.9.1")
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.ext)
 }
 
 publishing {
