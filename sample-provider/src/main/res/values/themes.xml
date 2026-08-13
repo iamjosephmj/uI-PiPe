@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.PipeProvider" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#00696D</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+    </style>
+</resources>
