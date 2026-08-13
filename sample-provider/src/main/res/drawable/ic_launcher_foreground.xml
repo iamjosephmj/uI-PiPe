@@ -1,0 +1,36 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Pipe body: an elbow bend (down, then right). -->
+    <path
+        android:pathData="M42,32 L42,54 Q42,66 54,66 L76,66"
+        android:strokeColor="#5EEAD4"
+        android:strokeWidth="15"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <!-- Sheen highlight down the centre of the pipe. -->
+    <path
+        android:pathData="M42,32 L42,54 Q42,66 54,66 L76,66"
+        android:strokeColor="#CFFAF3"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Top flange (caps the vertical opening). -->
+    <path
+        android:pathData="M29,23 h26 a3,3 0 0 1 3,3 v4 a3,3 0 0 1 -3,3 h-26 a3,3 0 0 1 -3,-3 v-4 a3,3 0 0 1 3,-3 z"
+        android:fillColor="#2DD4BF" />
+    <!-- Right flange (caps the horizontal opening). -->
+    <path
+        android:pathData="M75,53 v26 a3,3 0 0 0 3,3 h4 a3,3 0 0 0 3,-3 v-26 a3,3 0 0 0 -3,-3 h-4 a3,3 0 0 0 -3,3 z"
+        android:fillColor="#2DD4BF" />
+
+    <!-- Bolt holes on the flanges. -->
+    <path android:fillColor="#0A222E" android:pathData="M34,28 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+    <path android:fillColor="#0A222E" android:pathData="M50,28 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+    <path android:fillColor="#0A222E" android:pathData="M80,58 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+    <path android:fillColor="#0A222E" android:pathData="M80,74 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+</vector>

@@ -1,5 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:label="Pipe Sample Provider">
+    <application
+        android:label="Pipe Sample Provider"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round">
         <service
             android:name=".DemoPaneService"
             android:exported="true">
