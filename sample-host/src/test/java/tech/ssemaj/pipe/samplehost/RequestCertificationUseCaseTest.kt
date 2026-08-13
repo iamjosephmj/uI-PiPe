@@ -13,6 +13,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import tech.ssemaj.pipe.auth.PeerIdentity
 import tech.ssemaj.pipe.core.PipeMessage
 import tech.ssemaj.pipe.core.PipeState
@@ -34,6 +35,7 @@ private class FakeSession : PipeSession {
 }
 
 @RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35]) // Robolectric 4.16 tops out at API 35; compileSdk 36 has no SDK jar
 class RequestCertificationUseCaseTest {
 
     private val useCase = RequestCertificationUseCase(nonceSource = { ByteArray(32) { 7 } })
