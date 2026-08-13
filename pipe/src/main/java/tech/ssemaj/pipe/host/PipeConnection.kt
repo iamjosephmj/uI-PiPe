@@ -5,25 +5,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Binder
-import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.util.AttributeSet
-import android.util.Log
-import android.view.MotionEvent
-import android.view.SurfaceControlViewHost.SurfacePackage
-import android.view.SurfaceView
-import android.view.WindowManager
-import android.widget.FrameLayout
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.lifecycleScope
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.channels.awaitClose
@@ -31,17 +19,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 import tech.ssemaj.pipe.auth.AndroidSigningSource
 import tech.ssemaj.pipe.auth.IdentityResolver
 import tech.ssemaj.pipe.auth.PeerIdentity
 import tech.ssemaj.pipe.auth.PipeAuthorizer
-import tech.ssemaj.pipe.auth.PipeAuthorizers
 import tech.ssemaj.pipe.channel.InboundSequencer
 import tech.ssemaj.pipe.channel.OutboundSequencer
 import tech.ssemaj.pipe.core.CloseReason
@@ -49,10 +33,8 @@ import tech.ssemaj.pipe.core.DenialSource
 import tech.ssemaj.pipe.core.PipeDeniedException
 import tech.ssemaj.pipe.core.PipeException
 import tech.ssemaj.pipe.core.PipeMessage
-import tech.ssemaj.pipe.core.PipePresentation
 import tech.ssemaj.pipe.core.PipeProviderUnavailableException
 import tech.ssemaj.pipe.core.PipeRequest
-import tech.ssemaj.pipe.core.PipeSize
 import tech.ssemaj.pipe.core.PipeState
 import tech.ssemaj.pipe.core.PipeTimeoutException
 import tech.ssemaj.pipe.core.PipeTransportException
@@ -65,11 +47,6 @@ import tech.ssemaj.pipe.transport.IHostChannel
 import tech.ssemaj.pipe.transport.IOpenResultCallback
 import tech.ssemaj.pipe.transport.OpenSpec
 import tech.ssemaj.pipe.transport.Protocol
-
-private const val TAG = "PipeView"
-
-/** API 35 gates the public InputTransferToken/transferTouchGesture path; below it uses host tokens. */
-private val API35 = Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM
 
 /**
  * Maps a [GateResult.Failed] message (host-side gate, or a provider-side onError string —
@@ -88,72 +65,38 @@ internal fun gateFailureToException(message: String): PipeException = when {
     else -> PipeTransportException(message)
 }
 
-/** Embeds a verified provider's pane. Add to a layout, call [open]. */
-class PipeView @JvmOverloads constructor(
-    context: Context,
-    attrs: AttributeSet? = null,
+/**
+ * Host-side connection to a provider pane. Binds the provider service, runs the host gate, sends
+ * the host window token so the provider can add its full-screen pane, and exposes the live
+ * [PipeSession]. Holds no UI — the pane is a window the provider owns; the host only controls the
+ * session (messages, close). One connection drives one pane at a time.
+ *
+ * [hostToken] supplies the host activity's window token (`decorView.windowToken`); [open] waits
+ * for it to become non-null (the decor view must be attached) before sending the open request.
+ */
+internal class PipeConnection(
+    private val context: Context,
+    private val hostToken: () -> IBinder?,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
-) : FrameLayout(context, attrs) {
-
-    private val surfaceView = SurfaceView(context).also {
-        // Host content stays visually on top; the embedded pane is composited beneath it and
-        // touch is handed over explicitly (see [embeddedInputToken]) rather than via Z order.
-        it.setZOrderOnTop(false)
-        addView(it, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
-    }
+) {
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val windowManager = context.getSystemService(WindowManager::class.java)
-    private var embeddedInputToken: android.window.InputTransferToken? = null
     private var current: OpenAttempt? = null
-    @Volatile private var directInput = false
-
-    init {
-        // A regular SurfaceView does not forward touches into an embedded
-        // SurfaceControlViewHost automatically; the host must hand each gesture off, on every
-        // ACTION_DOWN, by transferring from its own input token to the embedded pane's token.
-        // Non-embedded (full-screen/dialog) panes skip this: the embedded surface is rendered on
-        // top via setZOrderOnTop and receives input directly, so it accepts repeated gestures
-        // without depending on per-gesture transfer.
-        surfaceView.setOnTouchListener { _, event ->
-            if (API35) {
-                // Public path: hand the current gesture to the embedded pane on ACTION_DOWN.
-                if (!directInput && event.actionMasked == MotionEvent.ACTION_DOWN) {
-                    val embedded = embeddedInputToken
-                    val hostToken = surfaceView.rootSurfaceControl?.inputTransferToken
-                    if (embedded != null && hostToken != null) {
-                        runCatching { windowManager?.transferTouchGesture(hostToken, embedded) }
-                            .onFailure { t -> Log.w(TAG, "transferTouchGesture threw; pane may not receive touch", t) }
-                    }
-                }
-                false
-            } else {
-                // API 30–34: no public input-token path exists, so forward the event to the
-                // provider (public API), which dispatches it into the pane. Consume it here.
-                current?.forwardInput(event) == true
-            }
-        }
-    }
 
     /**
-     * Opens [provider] and suspends until the pane is live, throwing a [PipeException] on any
-     * failure (denial, timeout, transport error, protocol mismatch). One pane per view: calling
-     * this while a session from a prior [open] is still live throws [IllegalStateException] —
-     * close it first.
+     * Binds [provider] and suspends until the pane is live, throwing a [PipeException] on any
+     * failure (denial, timeout, transport error, protocol mismatch). One pane per connection:
+     * calling this while a prior session is still live throws [IllegalStateException].
      */
     suspend fun open(
         provider: ProviderComponent,
         request: PipeRequest,
-        authorizer: PipeAuthorizer = PipeAuthorizers.sameSigningKey(context),
-        timeout: Duration = 10.seconds,
+        authorizer: PipeAuthorizer,
+        timeout: Duration,
     ): PipeSession = withContext(dispatcher) {
-        check(current == null) { "PipeView already has a live session; call close() first" }
+        check(current == null) { "PipeConnection already has a live session; call close() first" }
         val deferred = CompletableDeferred<PipeSession>()
         val attempt = OpenAttempt(provider, request, deferred)
         current = attempt
-        if (request.presentation != PipePresentation.EMBEDDED) {
-            directInput = true
-            surfaceView.setZOrderOnTop(true)
-        }
         try {
             withTimeout(timeout) {
                 val gate = HostGate(IdentityResolver(AndroidSigningSource(context)), authorizer)
@@ -177,60 +120,10 @@ class PipeView @JvmOverloads constructor(
         }
     }
 
-    /**
-     * Convenience wrapper: launches [open] on [owner]'s lifecycle scope, delivers the result to
-     * [onSession]/[onError], and closes the session automatically at `ON_DESTROY`.
-     */
-    fun openIn(
-        owner: LifecycleOwner,
-        provider: ProviderComponent,
-        request: PipeRequest,
-        authorizer: PipeAuthorizer = PipeAuthorizers.sameSigningKey(context),
-        onError: (PipeException) -> Unit = {},
-        onSession: (PipeSession) -> Unit = {},
-    ): Job {
-        val observer = object : DefaultLifecycleObserver {
-            override fun onDestroy(owner: LifecycleOwner) {
-                close()
-            }
-        }
-        owner.lifecycle.addObserver(observer)
-        return owner.lifecycleScope.launch {
-            try {
-                val session = open(provider, request, authorizer)
-                // Drop the ON_DESTROY observer as soon as the session closes on its own, so it
-                // doesn't sit on owner.lifecycle (retaining this PipeView) until activity destroy.
-                // A separate lifecycle-scoped coroutine so it doesn't delay this Job's completion
-                // (which callers observe as "open() finished, onSession/onError delivered").
-                owner.lifecycleScope.launch {
-                    session.state.first { it is PipeState.Closed }
-                    owner.lifecycle.removeObserver(observer)
-                }
-                onSession(session)
-            } catch (e: PipeException) {
-                owner.lifecycle.removeObserver(observer)
-                onError(e)
-            }
-        }
-    }
-
     /** Closes the current session (if any). Safe to call with no session open. */
     fun close() {
         current?.close(CloseReason.HOST_CLOSED, notifyProvider = true)
         current = null
-    }
-
-    override fun onDetachedFromWindow() {
-        close()
-        super.onDetachedFromWindow()
-    }
-
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        super.onSizeChanged(w, h, oldw, oldh)
-        val attempt = current
-        if (attempt != null) {
-            runCatching { attempt.remoteSession?.resize(w, h) }
-        }
     }
 
     private inner class OpenAttempt(
@@ -258,9 +151,6 @@ class PipeView @JvmOverloads constructor(
             }
             override suspend fun send(message: PipeMessage): Boolean =
                 guestChannel?.let { runCatching { it.send(outbound.stamp(message)) }.isSuccess } ?: false
-            override suspend fun resize(size: PipeSize) {
-                runCatching { remoteSession?.resize(size.widthPx, size.heightPx) }
-            }
             override fun close() { mainHandler.post { close(CloseReason.HOST_CLOSED, notifyProvider = true) } }
         }
 
@@ -273,7 +163,7 @@ class PipeView @JvmOverloads constructor(
                         0,
                     )
                 }
-                whenAttached { sendOpen(remote) }
+                whenTokenReady { sendOpen(remote) }
             }
             override fun onServiceDisconnected(name: ComponentName) {
                 mainHandler.post { providerGone(PipeTransportException("provider service disconnected")) }
@@ -289,32 +179,19 @@ class PipeView @JvmOverloads constructor(
             }
         }
 
-        /** Wait until the SurfaceView is attached so the host input token can be obtained. */
-        private fun whenAttached(block: () -> Unit) {
-            val ready = if (API35) surfaceView.rootSurfaceControl != null else windowToken != null
-            if (isAttachedToWindow && ready) { mainHandler.post { block() }; return }
-            surfaceView.post { whenAttached(block) }
+        /** Wait until the host activity's window token is available (decor view attached). */
+        private fun whenTokenReady(block: () -> Unit) {
+            if (closed) return
+            if (hostToken() != null) { mainHandler.post { block() }; return }
+            mainHandler.postDelayed({ whenTokenReady(block) }, 16)
         }
 
         private fun sendOpen(remote: IEmbedProvider) {
             if (closed) return
             try {
-                // API 35+ carries the public InputTransferToken; API 30–34 carries no token (input
-                // is forwarded over IEmbedSession.dispatchInput — there is no public pre-35 token).
-                val inputToken: android.os.Parcelable? = if (API35) {
-                    surfaceView.rootSurfaceControl?.inputTransferToken
-                        ?: throw IllegalStateException("no inputTransferToken; view not attached")
-                } else {
-                    null
-                }
-                // API 30–34: the public window token satisfies SurfaceControlViewHost's host-token
-                // requirement (so the pane renders); touch is delivered via input forwarding below.
+                val token = hostToken() ?: throw IllegalStateException("host window token unavailable")
                 val spec = OpenSpec(
-                    hostToken = if (API35) null else windowToken,
-                    inputToken = inputToken,
-                    displayId = display.displayId,
-                    widthPx = width.coerceAtLeast(1),
-                    heightPx = height.coerceAtLeast(1),
+                    hostToken = token,
                     request = request,
                     protocolVersion = Protocol.VERSION,
                 )
@@ -322,12 +199,6 @@ class PipeView @JvmOverloads constructor(
             } catch (t: Throwable) {
                 terminate(PipeTransportException("open() failed: ${t.message}", t))
             }
-        }
-
-        /** API 30–34 input path: forward a host-captured touch to the provider's pane. */
-        fun forwardInput(event: MotionEvent): Boolean {
-            val s = remoteSession ?: return false
-            return runCatching { s.dispatchInput(MotionEvent.obtain(event)); true }.getOrDefault(false)
         }
 
         /** Uid captured at gate time; -1 means unresolvable, so the check is skipped. */
@@ -360,13 +231,11 @@ class PipeView @JvmOverloads constructor(
         }
 
         private val openCallbackStub = object : IOpenResultCallback.Stub() {
-            override fun onOpened(surfacePackage: SurfacePackage, session: IEmbedSession, guest: IGuestChannel) {
+            override fun onOpened(session: IEmbedSession, guest: IGuestChannel) {
                 mainHandler.post {
                     if (closed) { runCatching { session.close() }; return@post }
                     remoteSession = session
                     guestChannel = guest
-                    surfaceView.setChildSurfacePackage(surfacePackage)
-                    embeddedInputToken = if (API35) runCatching { surfacePackage.inputTransferToken }.getOrNull() else null
                     stateFlow.value = PipeState.Open(checkNotNull(verifiedPeer) { "onOpened without a verified peer" })
                     deferred.complete(this@OpenAttempt.session)
                 }
@@ -380,21 +249,9 @@ class PipeView @JvmOverloads constructor(
         }
 
         /**
-         * Tear down a never-opened attempt (denied or errored before onOpened, bindService()
-         * returning false, a local failure while sending open(), or a timeout) by failing the
-         * [deferred] with [ex] — nothing was ever opened, so there is nothing to "close".
-         *
-         * If the provider actually opened a live surface before failing (called onOpened, then
-         * onDenied/onError — a protocol violation, or a race with a timeout), there IS something
-         * to close: route through the real close path instead so the surface/session/channel are
-         * released and the session's [PipeState] reflects [ex] as the closing cause. In that case
-         * [deferred] is already completed (successfully) and this is a no-op for it.
-         */
-        /**
          * The provider process/connection is gone (binder death, service disconnect). Pre-open
          * this is a failed attempt ([terminate]); post-open it's an unexpected close of a live
-         * session, reported with the accurate [CloseReason.PEER_DIED] rather than the generic
-         * reason [terminate] would apply.
+         * session, reported with [CloseReason.PEER_DIED].
          */
         fun providerGone(ex: PipeTransportException) {
             if (remoteSession == null) {
@@ -413,10 +270,7 @@ class PipeView @JvmOverloads constructor(
             closed = true
             if (bound) runCatching { context.unbindService(connection) }
             bound = false
-            if (current === this@OpenAttempt) {
-                current = null; embeddedInputToken = null
-                directInput = false; surfaceView.setZOrderOnTop(false)
-            }
+            if (current === this@OpenAttempt) current = null
             deferred.completeExceptionally(ex)
         }
 
@@ -428,10 +282,7 @@ class PipeView @JvmOverloads constructor(
             bound = false
             remoteSession = null
             guestChannel = null
-            if (current === this@OpenAttempt) {
-                current = null; embeddedInputToken = null
-                directInput = false; surfaceView.setZOrderOnTop(false)
-            }
+            if (current === this@OpenAttempt) current = null
             stateFlow.value = PipeState.Closed(cause)
             messageListeners.forEach { it.close() }
             messageListeners.clear()

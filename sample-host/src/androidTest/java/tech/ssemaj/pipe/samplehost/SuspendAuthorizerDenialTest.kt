@@ -25,6 +25,9 @@ class SuspendAuthorizerDenialTest {
         val intent = Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java)
             .putExtra("targetAuthorizer", "suspend-deny")
         ActivityScenario.launch<MainActivity>(intent)
+        assertTrue("host screen did not appear",
+            device.wait(Until.hasObject(By.text("Request certification")), TIMEOUT))
+        device.findObject(By.text("Request certification")).click()
         assertTrue("host did not report denial",
             device.wait(Until.hasObject(By.text("denied: async-policy")), TIMEOUT))
         assertFalse("pane must never render after async denial", device.hasObject(By.text("pane-ready")))

@@ -2,8 +2,6 @@ package tech.ssemaj.pipe.samplehost.presentation
 
 import tech.ssemaj.pipe.samplehost.domain.CertificationResult
 
-enum class PipeStatus { CONNECTING, CONNECTED, CLOSED }
-
 sealed interface FlowPhase {
     data object Idle : FlowPhase
     data object WaitingForProvider : FlowPhase
@@ -15,9 +13,7 @@ sealed interface FlowPhase {
     data class PipeFailure(val text: String) : FlowPhase
 }
 
-data class UiState(
-    val pipeStatus: PipeStatus = PipeStatus.CONNECTING,
-    val phase: FlowPhase = FlowPhase.Idle,
-    /** Incremented on Reopen; keys the AndroidView so a fresh PipeView is created. */
-    val paneGeneration: Int = 0,
-)
+data class UiState(val phase: FlowPhase = FlowPhase.Idle) {
+    /** A certification is mid-flight: the full-screen pane is up or the host is verifying. */
+    val inProgress: Boolean get() = phase is FlowPhase.WaitingForProvider || phase is FlowPhase.Verifying
+}

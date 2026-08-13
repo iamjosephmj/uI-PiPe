@@ -11,110 +11,61 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import tech.ssemaj.pipe.host.PipeView
 import tech.ssemaj.pipe.samplehost.domain.CertificationResult
 import tech.ssemaj.pipe.samplehost.presentation.FlowPhase
-import tech.ssemaj.pipe.samplehost.presentation.PipeStatus
 import tech.ssemaj.pipe.samplehost.presentation.UiState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CertificationScreen(
     state: UiState,
-    onPaneViewCreated: (PipeView) -> Unit,
-    onRequest: () -> Unit,
-    onReopen: () -> Unit,
-    onOpenFullScreen: () -> Unit = {},
-    onOpenDialog: () -> Unit = {},
-    onOpenMultiPane: () -> Unit = {},
+    onStart: () -> Unit,
 ) {
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Pipe Certification") },
-                actions = {
-                    StatusChip(state.pipeStatus)
-                    TextButton(onClick = onReopen) { Text("Reopen") }
-                },
-            )
-        },
+        topBar = { TopAppBar(title = { Text("Pipe Certification") }) },
     ) { padding ->
         Column(
             modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Card(modifier = Modifier.fillMaxWidth()) {
-                key(state.paneGeneration) {
-                    AndroidView(
-                        factory = { context -> PipeView(context).also(onPaneViewCreated) },
-                        modifier = Modifier.fillMaxWidth().height(260.dp),
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Verified cross-process certification", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Request certification opens the provider's own full-screen pane over this " +
+                            "app — a real window with native input. Approve there, and the signed " +
+                            "attestation is verified back here.",
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
-            val inFlight = state.phase is FlowPhase.WaitingForProvider || state.phase is FlowPhase.Verifying
             val terminal = state.phase is FlowPhase.Done || state.phase is FlowPhase.Declined ||
                 state.phase is FlowPhase.Timeout || state.phase is FlowPhase.PipeFailure
-            // A pane accepts one interactive consent per session, so each certification runs in a
-            // fresh session: after a result the primary action reopens before requesting again.
             Button(
-                onClick = if (terminal) onReopen else onRequest,
-                enabled = state.pipeStatus == PipeStatus.CONNECTED && !inFlight,
+                onClick = onStart,
+                enabled = !state.inProgress,
                 modifier = Modifier.fillMaxWidth(),
             ) { Text(if (terminal) "Certify again" else "Request certification") }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutlinedButton(
-                    onClick = onOpenFullScreen,
-                    modifier = Modifier.weight(1f),
-                ) { Text("Full-screen") }
-                OutlinedButton(
-                    onClick = onOpenDialog,
-                    modifier = Modifier.weight(1f),
-                ) { Text("Dialog") }
-            }
-            OutlinedButton(
-                onClick = onOpenMultiPane,
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text("Multi-pane") }
             PhaseCard(state.phase)
         }
     }
-}
-
-@Composable
-private fun StatusChip(status: PipeStatus) {
-    AssistChip(onClick = {}, label = {
-        Text(
-            when (status) {
-                PipeStatus.CONNECTING -> "Connecting…"
-                PipeStatus.CONNECTED -> "Connected"
-                PipeStatus.CLOSED -> "Closed"
-            }
-        )
-    })
 }
 
 @Composable

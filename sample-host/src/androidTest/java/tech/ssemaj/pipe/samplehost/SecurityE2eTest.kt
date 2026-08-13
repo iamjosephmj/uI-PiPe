@@ -25,6 +25,9 @@ class SecurityE2eTest {
             .putExtra("targetPackage", "tech.ssemaj.pipe.evilprovider")
             .putExtra("targetService", "tech.ssemaj.pipe.evilprovider.EvilPaneService")
         ActivityScenario.launch<MainActivity>(intent)
+        assertTrue("host screen did not appear",
+            device.wait(Until.hasObject(By.text("Request certification")), TIMEOUT))
+        device.findObject(By.text("Request certification")).click()
         assertTrue("host did not report denial",
             device.wait(Until.hasObject(By.textStartsWith("denied:")), TIMEOUT))
         assertFalse("evil pane must never render", device.hasObject(By.text("EVIL-PANE")))

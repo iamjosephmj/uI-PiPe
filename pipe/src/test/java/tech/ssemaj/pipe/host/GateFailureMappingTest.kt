@@ -5,7 +5,7 @@ import org.junit.Test
 import tech.ssemaj.pipe.core.PipeProviderUnavailableException
 import tech.ssemaj.pipe.core.PipeVersionMismatchException
 
-class PipeViewMappingTest {
+class GateFailureMappingTest {
     @Test fun mapsCertUnreadable() {
         val e = gateFailureToException("unavailable:CERT_UNREADABLE")
         assertTrue(e is PipeProviderUnavailableException &&

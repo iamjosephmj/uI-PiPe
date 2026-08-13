@@ -1,15 +1,19 @@
 package tech.ssemaj.pipe.provider
 
 import android.app.Service
+import android.content.Context
 import android.content.Intent
-import android.hardware.display.DisplayManager
+import android.graphics.PixelFormat
 import android.os.Binder
-import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
-import android.view.SurfaceControlViewHost
+import android.view.Gravity
+import android.view.KeyEvent
+import android.view.WindowInsets
+import android.view.WindowManager
+import android.widget.FrameLayout
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -26,8 +30,6 @@ import tech.ssemaj.pipe.channel.InboundSequencer
 import tech.ssemaj.pipe.channel.OutboundSequencer
 import tech.ssemaj.pipe.core.CloseReason
 import tech.ssemaj.pipe.core.PipeMessage
-import tech.ssemaj.pipe.core.PipeRequest
-import tech.ssemaj.pipe.core.PipeSize
 import tech.ssemaj.pipe.transport.IEmbedProvider
 import tech.ssemaj.pipe.transport.IEmbedSession
 import tech.ssemaj.pipe.transport.IGuestChannel
@@ -40,9 +42,13 @@ import tech.ssemaj.pipe.transport.Protocol
  * Base class for pane provider services. Subclass, implement [onOpenPane],
  * export with action tech.ssemaj.pipe.action.OPEN_PANE.
  *
- * Multi-pane: each distinct host that opens a pane gets its own independent
- * [ActivePane], keyed by that host's callback binder. Closing/dying of one
- * host's pane never affects any other host's pane.
+ * A pane is a single full-screen `TYPE_APPLICATION_PANEL` window the provider adds over the host,
+ * parented to the host activity's window token (carried in [OpenSpec.hostToken]). Because it is a
+ * real window in the host's hierarchy, it is a first-class focus/IME/input target on every API
+ * from 30 up — no `SurfaceControlViewHost`, no `@hide` APIs, no touch forwarding.
+ *
+ * Multi-host: each distinct host that opens a pane gets its own independent [ActivePane], keyed by
+ * that host's callback binder. Closing/dying of one host's pane never affects another's.
  */
 abstract class PipeProviderService : Service() {
 
@@ -50,7 +56,7 @@ abstract class PipeProviderService : Service() {
     open fun authorizer(): PipeAuthorizer = PipeAuthorizers.sameSigningKey(this)
 
     /** Build the pane (or reject the request). Runs in [paneScope] (main thread). */
-    abstract suspend fun onOpenPane(request: PipeRequest, host: HostHandle): PaneResult
+    abstract suspend fun onOpenPane(request: tech.ssemaj.pipe.core.PipeRequest, host: HostHandle): PaneResult
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -97,10 +103,14 @@ abstract class PipeProviderService : Service() {
         callback: IOpenResultCallback,
     ) {
         val outbound = OutboundSequencer()
+        // `closer` is wired once the pane exists (below); until then close() is a no-op — the
+        // provider only holds the handle after onOpenPane returns, by which point it is set.
+        var closer: (() -> Unit)? = null
         val hostHandle = object : HostHandle {
             override val peer: PeerIdentity = peer
             override suspend fun send(message: PipeMessage): Boolean =
                 runCatching { hostChannel.send(outbound.stamp(message)) }.isSuccess
+            override fun close() { closer?.invoke() }
         }
         when (val result = onOpenPane(spec.request, hostHandle)) {
             is PaneResult.Reject -> {
@@ -109,28 +119,38 @@ abstract class PipeProviderService : Service() {
             }
             is PaneResult.Content -> {
                 val content = result.content
-                val display = getSystemService(DisplayManager::class.java).getDisplay(spec.displayId)
-                // API 35+ links input via the public InputTransferToken; API 30–34 uses the older
-                // host-token (IBinder) constructor — same SurfaceControlViewHost, older input path.
-                val scvh = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-                    SurfaceControlViewHost(this, display, spec.inputToken as android.window.InputTransferToken)
-                } else {
-                    @Suppress("DEPRECATION")
-                    SurfaceControlViewHost(this, display, spec.hostToken)
-                }
-                scvh.setView(content.view, spec.widthPx, spec.heightPx)
-
                 val hostBinder = hostChannel.asBinder()
-                val pane = ActivePane(scvh, content, hostChannel, hostBinder, mainHandler, peer.uid)
+                val match = FrameLayout.LayoutParams.MATCH_PARENT
+                val root = PaneRoot(this).apply {
+                    addView(content.view, FrameLayout.LayoutParams(match, match))
+                }
+                val lp = WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.TYPE_APPLICATION_PANEL,
+                    0,
+                    PixelFormat.OPAQUE,
+                ).apply {
+                    token = spec.hostToken
+                    gravity = Gravity.TOP or Gravity.START
+                    softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+                }
+                val windowManager = getSystemService(WindowManager::class.java)
+                windowManager.addView(root, lp)
+
+                val pane = ActivePane(windowManager, root, content, hostChannel, hostBinder, mainHandler, peer.uid)
+                // BACK inside the pane's own (focusable) window dismisses it, provider-side; so does
+                // an explicit HostHandle.close() from provider content.
+                root.onBack = { pane.close(CloseReason.PROVIDER_CLOSED) }
+                closer = { mainHandler.post { pane.close(CloseReason.PROVIDER_CLOSED) } }
                 try {
                     // Host death → tear down only this host's pane.
-                    hostChannel.asBinder()
-                        .linkToDeath({ mainHandler.post { pane.close(CloseReason.PEER_DIED) } }, 0)
-                    // Same-host re-open: close and release the previously registered pane
-                    // for this host binder so its SCVH surface isn't leaked. A different
-                    // host's binder is a different map key, so it is unaffected.
+                    hostBinder.linkToDeath({ mainHandler.post { pane.close(CloseReason.PEER_DIED) } }, 0)
+                    // Same-host re-open: close and release the previously registered pane for this
+                    // host binder so its window isn't leaked. A different host's binder is a
+                    // different map key, so it is unaffected.
                     panes.put(hostBinder, pane)?.close(CloseReason.PROVIDER_CLOSED)
-                    callback.onOpened(scvh.surfacePackage, pane.session, pane.guestChannel)
+                    callback.onOpened(pane.session, pane.guestChannel)
                 } catch (t: Throwable) {
                     pane.close(CloseReason.PROVIDER_CLOSED)
                     throw t
@@ -146,8 +166,35 @@ abstract class PipeProviderService : Service() {
         super.onDestroy()
     }
 
+    /**
+     * Root of the pane's window. Pads itself by the system-bar insets so provider content is never
+     * drawn under the status/navigation bars, and turns a BACK key press (this window is focusable,
+     * so it receives keys) into a provider-side dismissal via [onBack].
+     */
+    private class PaneRoot(context: Context) : FrameLayout(context) {
+        var onBack: (() -> Unit)? = null
+
+        init {
+            isFocusableInTouchMode = true
+            setOnApplyWindowInsetsListener { v, insets ->
+                val bars = insets.getInsets(WindowInsets.Type.systemBars())
+                v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+                insets
+            }
+        }
+
+        override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+            if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                onBack?.invoke()
+                return true
+            }
+            return super.dispatchKeyEvent(event)
+        }
+    }
+
     private inner class ActivePane(
-        private val scvh: SurfaceControlViewHost,
+        private val windowManager: WindowManager,
+        private val root: FrameLayout,
         private val content: PipeContent,
         private val hostChannel: IHostChannel,
         private val hostBinder: IBinder,
@@ -162,24 +209,9 @@ abstract class PipeProviderService : Service() {
             hostUid != -1 && Binder.getCallingUid() != hostUid
 
         val session = object : IEmbedSession.Stub() {
-            override fun resize(widthPx: Int, heightPx: Int) {
-                if (callerUidMismatch()) return
-                handler.post {
-                    if (closed) return@post
-                    scvh.relayout(widthPx, heightPx)
-                    content.onResized(PipeSize(widthPx, heightPx))
-                }
-            }
             override fun close() {
                 if (callerUidMismatch()) return
                 handler.post { close(CloseReason.HOST_CLOSED) }
-            }
-            override fun dispatchInput(event: android.view.MotionEvent) {
-                if (callerUidMismatch()) return
-                handler.post {
-                    if (!closed) content.view.dispatchTouchEvent(event)
-                    runCatching { event.recycle() }
-                }
             }
         }
 
@@ -194,7 +226,7 @@ abstract class PipeProviderService : Service() {
         fun close(reason: CloseReason) {
             if (closed) return
             closed = true
-            runCatching { scvh.release() }
+            runCatching { windowManager.removeViewImmediate(root) }
             content.onClosed(reason)
             if (reason != CloseReason.HOST_CLOSED) {
                 runCatching { hostChannel.onClosed(reason.toWire()) }

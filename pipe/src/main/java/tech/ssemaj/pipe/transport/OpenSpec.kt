@@ -7,25 +7,17 @@ import kotlinx.parcelize.Parcelize
 import tech.ssemaj.pipe.core.PipeRequest
 
 /**
- * Everything the provider needs to build the embedded hierarchy.
+ * Everything the provider needs to add its full-screen pane over the host.
  *
- * The host token is carried in one of two pre-35-safe forms so this class can load on API 30–34
- * (where `android.window.InputTransferToken` does not exist):
- *  - [hostToken]: the host's public window token (`View.getWindowToken()`) on API 30–34, which
- *    satisfies `SurfaceControlViewHost`'s host-token requirement so the pane renders. Touch is
- *    then delivered by forwarding (`IEmbedSession.dispatchInput`) — public APIs only, no `@hide`.
- *  - [inputToken]: the API-35 `android.window.InputTransferToken`, held as a generic [Parcelable]
- *    (never referenced by its concrete type here) so pre-35 devices never resolve the class.
- * Exactly one is non-null, selected by the host's API level.
+ * [hostToken] is the host activity's window token (`View.getWindowToken()` of the decor view).
+ * The provider adds a `TYPE_APPLICATION_PANEL` sub-window parented to that token, so the pane is a
+ * real window in the host's window hierarchy — a first-class focus/IME/input target on every API
+ * from 30 up, with no `@hide` APIs and no per-gesture touch forwarding.
  */
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
 @Parcelize
 data class OpenSpec(
-    val hostToken: IBinder?,
-    val inputToken: Parcelable?,
-    val displayId: Int,
-    val widthPx: Int,
-    val heightPx: Int,
+    val hostToken: IBinder,
     val request: PipeRequest,
     val protocolVersion: Int,
 ) : Parcelable

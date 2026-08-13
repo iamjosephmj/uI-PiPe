@@ -1,23 +1,30 @@
 package tech.ssemaj.pipe.host
 
-import android.view.ViewGroup
-import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.seconds
 import tech.ssemaj.pipe.auth.PipeAuthorizer
 import tech.ssemaj.pipe.auth.PipeAuthorizers
 import tech.ssemaj.pipe.core.PipeException
-import tech.ssemaj.pipe.core.PipePresentation
 import tech.ssemaj.pipe.core.PipeRequest
 import tech.ssemaj.pipe.core.PipeState
-import tech.ssemaj.pipe.core.forcePresentation
 
-/** Opens a pane that fills [activity]'s content area. Back, session close (from either side, or
- *  peer death), or an open error removes the container — whichever happens first. */
+/**
+ * Opens a verified provider's full-screen pane over [activity].
+ *
+ * The pane is a window the provider adds on top of the host, parented to the host's window token —
+ * there is nothing to place in the host's own layout. This call binds the provider, verifies it
+ * against [authorizer], and delivers the live [PipeSession] to [onSession] (or a [PipeException] to
+ * [onError]). The pane is torn down when the session closes from any side, on `ON_DESTROY`, or on
+ * back-press — whichever comes first. Back inside the pane is handled by the provider's own window;
+ * the host back-press callback here is the fallback for when focus is still on the host.
+ */
 object PipeFullScreen {
     fun open(
         activity: ComponentActivity,
@@ -27,56 +34,38 @@ object PipeFullScreen {
         onSession: (PipeSession) -> Unit = {},
         onError: (PipeException) -> Unit = {},
     ): Job {
-        val root = activity.findViewById<ViewGroup>(android.R.id.content)
-        // The inset padding is applied to a wrapper CONTAINER, not to pipeView itself: padding a
-        // view doesn't change its own measured size (or fire onSizeChanged), so PipeView would
-        // report the full unpadded screen to the provider while the real surface underneath is
-        // smaller by the insets. Shrinking the container instead shrinks pipeView (its
-        // MATCH_PARENT child), so PipeView's own bounds — and the size it reports — stay correct.
-        val container = FrameLayout(activity)
-        val pipeView = PipeView(activity)
-        container.setOnApplyWindowInsetsListener { v, insets ->
-            val bars = insets.getInsets(android.view.WindowInsets.Type.systemBars())
-            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
-            insets
+        val connection = PipeConnection(activity, hostToken = { activity.window.decorView.windowToken })
+
+        val observer = object : DefaultLifecycleObserver {
+            override fun onDestroy(owner: LifecycleOwner) = connection.close()
         }
-        root.addView(container, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        container.addView(pipeView, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        container.requestApplyInsets()
+        activity.lifecycle.addObserver(observer)
 
         val backCallback = object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                pipeView.close()
-                remove(root, container, this)
-            }
+            override fun handleOnBackPressed() = connection.close()
         }
         activity.onBackPressedDispatcher.addCallback(activity, backCallback)
 
-        return pipeView.openIn(
-            owner = activity,
-            provider = provider,
-            request = request.forcePresentation(PipePresentation.FULL_SCREEN),
-            authorizer = authorizer,
-            onError = { e -> remove(root, container, backCallback); onError(e) },
-            onSession = { session ->
-                // The session can end other ways than back-press (host-initiated close, provider
-                // close, peer death) — tear the container down then too, so it never leaks.
+        fun detach() {
+            backCallback.isEnabled = false
+            backCallback.remove()
+            activity.lifecycle.removeObserver(observer)
+        }
+
+        return activity.lifecycleScope.launch {
+            try {
+                val session = connection.open(provider, request, authorizer, 10.seconds)
+                // The session can end other ways than back-press (host close, provider close, peer
+                // death) — drop the observer/back callback then too, so they never leak.
                 activity.lifecycleScope.launch {
                     session.state.first { it is PipeState.Closed }
-                    remove(root, container, backCallback)
+                    detach()
                 }
                 onSession(session)
-            },
-        )
-    }
-
-    /** Idempotent: back-press and the session-state observer can both fire for the same close. */
-    private fun remove(root: ViewGroup, container: FrameLayout, cb: OnBackPressedCallback) {
-        if (!cb.isEnabled) return
-        cb.isEnabled = false
-        cb.remove()
-        (container.parent as? ViewGroup)?.removeView(container)
+            } catch (e: PipeException) {
+                detach()
+                onError(e)
+            }
+        }
     }
 }

@@ -1,6 +1,6 @@
 # Pipe — Architecture
 
-Pipe lets one Android app render a **live, fully interactive UI inside another app's window**, across a process boundary, with a cryptographic identity check on both ends. A **host** app places a pane in its layout; a **provider** app renders a `View` into that pane in its *own* process, over the platform's `SurfaceControlViewHost` transport, with a two-way typed message channel between them.
+Pipe lets one Android app render a **live, fully interactive full-screen UI over another app's window**, across a process boundary, with a cryptographic identity check on both ends. A **host** activity hands its window token to a **provider** app; the provider renders a `View` as a real full-screen window in the host's window hierarchy, in its *own* process, with a two-way typed message channel between them.
 
 This document explains how that works and why it is built the way it is. For task-level API usage, see [`README.md`](README.md).
 
@@ -15,15 +15,19 @@ Pipe crosses that line **cooperatively and safely**: two apps that both opt in c
 - **Two independent UI threads.** The pane renders and handles input on the *provider's* main-thread Looper, on its own frame budget. Host jank never stalls the pane; pane jank never stalls the host.
 - **Two separate heaps and garbage collectors.** The provider's allocations and GC pauses do not touch the host's UI thread, and its memory does not count against the host's per-process heap limit.
 - **Crash and OOM isolation.** If the provider dies, the host survives and observes a clean `PEER_DIED` close.
-- **A verified trust boundary.** Each side cryptographically checks the other's signing identity before any surface or message crosses. The provider's code never runs in the host's process.
+- **A verified trust boundary.** Each side cryptographically checks the other's signing identity before any window is added or message crosses. The provider's code never runs in the host's process.
 
-The mechanism is "two processes cooperating"; the value is "a host safely running an untrusted provider's live UI on its own budget." It is *not* a way to get more CPU cores — a busy device still time-shares the same cores. The win is **isolation of parallelism** (separate main thread, heap, and failure domain) plus a **security boundary between two different apps**.
+The mechanism is "two processes cooperating"; the value is "a host safely running an untrusted-but-verified provider's live UI on its own budget." It is *not* a way to get more CPU cores — a busy device still time-shares the same cores. The win is **isolation of parallelism** (separate main thread, heap, and failure domain) plus a **security boundary between two different apps**.
 
 ### What it is not
 
 - Not a general parallel-compute framework — for that, use coroutines/threads within one process. Pipe's value is specifically isolated **UI** + a cross-app trust boundary.
-- Not an overlay/tapjacking trick. Pipe uses only the platform's sanctioned cross-process UI APIs and deliberately avoids window-token or draw-over side channels.
+- Not a silent overlay / tapjacking trick. The provider *does* add a window over the host — but only after the host has cryptographically verified the provider's signing identity and explicitly handed over its window token. Both apps opt in; the host owns the binding and can revoke it. See §12.
 - Not for an open marketplace of arbitrary providers. It targets a **closed app family / vetted partners** (same signing key, or an explicit certificate allowlist).
+
+### One capability, on purpose
+
+Pipe does exactly one thing: a provider draws a **single full-screen pane** over the host. An earlier design embedded a resizable, multi-instance pane inside the host's layout via `SurfaceControlViewHost`. That was deliberately cut: SCVH's cross-process input was only a first-class focus/IME target from API 35 up, and the pre-35 fallbacks leaned on touch-forwarding that never gave real soft-keyboard input. The full-screen sub-window is a *real* window, so focus, input, and IME work identically on every supported API with only public APIs — a smaller surface that behaves the same everywhere beats a larger one that behaves differently per version.
 
 ---
 
@@ -31,11 +35,10 @@ The mechanism is "two processes cooperating"; the value is "a host safely runnin
 
 | Term | Meaning |
 |---|---|
-| **Host** | The app that embeds a pane and controls its placement, size, lifetime, and revocation. |
-| **Provider** | The app that renders the pane's `View`, in its own process, on request. |
-| **Pane** | The embedded surface: the provider's `View` composited into the host's window via `SurfaceControlViewHost`. |
+| **Host** | The app that opens a pane and controls its lifetime and revocation. It supplies its window token; it does not place anything in its own layout. |
+| **Provider** | The app that renders the pane's `View` as a full-screen window, in its own process, on request. |
+| **Pane** | The provider's `View`, shown as a `TYPE_APPLICATION_PANEL` window parented to the host activity's window token. |
 | **Session** | A live, opened pane. Represented host-side by `PipeSession`; ends on close or peer death. |
-| **Presentation** | How the host shows the pane: `EMBEDDED`, `FULL_SCREEN`, or `DIALOG`. |
 | **Peer identity** | The cryptographically verified UID + package(s) + signing-cert lineage of the other side. |
 
 ---
@@ -46,10 +49,10 @@ The mechanism is "two processes cooperating"; the value is "a host safely runnin
 :pipe                  The library. Host API, provider API, transport, identity, channels.
 :pipe-serialization    Opt-in typed messaging: CBOR encode/decode over the raw PipeMessage envelope.
 :sample-contract       Example @Serializable message contract shared by the two sample apps.
-:sample-host           Demo host: embedded / full-screen / dialog / multi-pane, over a certification flow.
+:sample-host           Demo host: a Compose screen that opens the provider's full-screen certification pane.
 :sample-provider       Demo provider: a consent pane that signs a host nonce with an AndroidKeyStore key.
 :evil-host             Adversarial host, signed with a different key — proves the provider gate rejects it.
-:evil-provider         Adversarial provider — proves the host gate rejects it, with no surface or bind.
+:evil-provider         Adversarial provider — proves the host gate rejects it, with no window or bind.
 ```
 
 Only `:pipe` (and optionally `:pipe-serialization`) ship. The `evil-*` modules exist so the security properties are asserted by real instrumented tests, not just claimed.
@@ -62,12 +65,12 @@ Only `:pipe` (and optionally `:pipe-serialization`) ship. The `evil-*` modules e
 
 ```
 core/         Public value types crossing the boundary and surfaced to callers:
-              Pipe (constants), PipeRequest, PipeMessage, PipeSize, PipePresentation,
+              Pipe (constants), PipeRequest, PipeMessage,
               PipeState, CloseReason, PipeError, PipeException hierarchy.
 auth/         Identity + authorization: PeerIdentity, SigningSource/AndroidSigningSource,
               IdentityResolver, PipeAuthorizer, PipeAuthorizers, AuthDecision.
-host/         Host side: PipeView, PipeFullScreen, PipeDialog, PipeSession, ProviderComponent,
-              HostGate.
+host/         Host side: PipeFullScreen (public entry), PipeConnection (bind/gate/channel
+              machinery), PipeSession, ProviderComponent, HostGate.
 provider/     Provider side: PipeProviderService, PipeContent, PaneResult, HostHandle, ProviderGate.
 channel/      MessageSequencer (OutboundSequencer / InboundSequencer).
 discovery/    PipeDiscovery, ProviderDescriptor.
@@ -90,13 +93,13 @@ interface IEmbedProvider {
 
 // Result of open(), delivered by the provider. Provider → host.
 oneway interface IOpenResultCallback {
-    void onOpened(in SurfacePackage surfacePackage, IEmbedSession session, IGuestChannel guestChannel);
+    void onOpened(IEmbedSession session, IGuestChannel guestChannel);
     void onDenied(String reason);
     void onError(String message);
 }
 
 // Host's handle to control a live pane. Host → provider.
-interface IEmbedSession { oneway void resize(int w, int h); oneway void close(); }
+interface IEmbedSession { oneway void close(); }
 
 // Provider → host messages + close signal. Provider holds this (given in open()).
 interface IHostChannel { oneway void send(in PipeMessage m); oneway void onClosed(int closeReasonWire); }
@@ -105,24 +108,23 @@ interface IHostChannel { oneway void send(in PipeMessage m); oneway void onClose
 interface IGuestChannel { oneway void send(in PipeMessage m); }
 ```
 
-`OpenSpec` is the launch payload the host hands the provider:
+`OpenSpec` is the launch payload the host hands the provider — just the host's window token plus the request:
 
 ```
 OpenSpec(
-    hostToken: IBinder?,       // public window token for API 30–34 (View.getWindowToken)
-    inputToken: Parcelable?,   // API-35 InputTransferToken, carried as Parcelable so pre-35 can load OpenSpec
-    displayId: Int,
-    widthPx, heightPx: Int,
-    request: PipeRequest,      // action + extras + presentation
+    hostToken: IBinder,     // host activity's window token (decorView.getWindowToken())
+    request: PipeRequest,   // action + extras
     protocolVersion: Int,
 )
 ```
+
+There is no surface, size, display, or input token on the wire: the provider adds its own full-screen window, so the host has nothing to render and nothing to size.
 
 ### The open handshake
 
 ```mermaid
 sequenceDiagram
-    participant H as Host (PipeView)
+    participant H as Host (PipeConnection)
     participant PM as PackageManager
     participant S as Provider service (IEmbedProvider)
     participant P as PipeProviderService
@@ -130,24 +132,23 @@ sequenceDiagram
     H->>H: HostGate.admit(component, request)
     H->>PM: resolve ComponentName + signing certs
     H->>H: PipeAuthorizer.authorize(peer, request)  (fail-closed)
-    Note over H: denied → throw PipeDeniedException, never bind
+    Note over H: denied → PipeDeniedException, never bind
     H->>S: bindService(ACTION_OPEN_PANE)
-    H->>S: open(OpenSpec, hostChannel, callback)  [oneway]
+    H->>S: open(OpenSpec[hostToken], hostChannel, callback)  [oneway]
     Note over S: read Binder.getCallingUid() on the binder thread
     S->>P: ProviderGate.admit(callingUid, request, protocolVersion)
-    Note over P: denied → callback.onDenied(reason), no surface built
+    Note over P: denied → callback.onDenied(reason), no window added
     P->>P: onOpenPane(request, hostHandle) → PaneResult.Content(view)
-    P->>P: SurfaceControlViewHost(display, host/inputToken).setView(view, w, h)
-    P-->>H: onOpened(surfacePackage, IEmbedSession, IGuestChannel)
-    H->>H: surfaceView.setChildSurfacePackage(surfacePackage)
+    P->>P: WindowManager.addView(view, TYPE_APPLICATION_PANEL, token = hostToken)
+    P-->>H: onOpened(IEmbedSession, IGuestChannel)
     H->>H: state = Open
 ```
 
 Key points:
 
 - **Identity is read at the earliest correct moment.** `Binder.getCallingUid()` only reflects the caller *inside* the transaction, so the provider captures it on the binder thread before any coroutine hop.
-- **Gating happens on both ends, before anything expensive.** The host authorizes the provider before it binds; the provider authorizes the host before it builds a surface. A denial on either side produces no surface and (host side) no bind.
-- **The surface travels as a `SurfacePackage`.** The provider builds a `SurfaceControlViewHost` against the host's input token (an API-35 `InputTransferToken`, or a pre-35 `IBinder` host token — see §9) and display, then ships the wrapped surface back; the host attaches it with `SurfaceView.setChildSurfacePackage`.
+- **Gating happens on both ends, before anything expensive.** The host authorizes the provider before it binds; the provider authorizes the host before it adds any window. A denial on either side adds no window and (host side) does not bind.
+- **The pane is a window the provider owns.** The provider adds a `TYPE_APPLICATION_PANEL` window parented to the host's window token (§9); nothing is shipped back for the host to render — `onOpened` carries only the control-session and guest channel binders.
 
 ---
 
@@ -156,15 +157,15 @@ Key points:
 ```mermaid
 flowchart LR
     subgraph HostProc["Host process"]
-        HMain["main thread<br/>PipeView, host UI"]
+        HMain["main thread<br/>host activity + UI"]
         HHeap["heap + GC"]
     end
     subgraph ProvProc["Provider process"]
-        PMain["main thread<br/>pane View, paneScope"]
+        PMain["main thread<br/>pane window, paneScope"]
         PHeap["heap + GC"]
     end
     HMain <-->|"binder (oneway)<br/>PipeMessage / control"| PMain
-    HMain -. "composited surface<br/>(SurfacePackage)" .-> PMain
+    HMain -. "window token<br/>(parents the pane)" .-> PMain
 ```
 
 - The provider's pane construction, message handling, and provider-initiated sends run on the provider's **main thread** via a service-owned `paneScope` (`Dispatchers.Main.immediate` + `SupervisorJob`). The provider is responsible for pushing its own heavy work onto background threads — Pipe gives it a *separate* main thread, not extra ones.
@@ -198,21 +199,21 @@ Because `authorize` is `suspend`, a policy may consult a remote service, a datab
 
 ### Two gates
 
-- `HostGate.admit(component, request)` (host) resolves the provider's identity, runs the authorizer, and returns `Admitted(peer)` / `Refused(reason)` / `Failed(message)`. Only `Admitted` proceeds to bind.
-- `ProviderGate.admit(callingUid, request, protocolVersion)` (provider) does the same for the host, plus a protocol-version check, before any surface is built.
+- `HostGate.admit(component, request)` (host) resolves the provider's identity, runs the authorizer, and returns `Admitted(peer)` / `Refused(reason)` / `Failed(message)`. Only `Admitted` proceeds to bind and hand over the window token.
+- `ProviderGate.admit(callingUid, request, protocolVersion)` (provider) does the same for the host, plus a protocol-version check, before any window is added.
 
 ### UID-gated callbacks (defense in depth)
 
 After a session is live, **every** inbound binder call is re-checked against the UID admitted at open time, on both sides:
 
-- The provider's `IEmbedSession.resize/close` and `IGuestChannel.send` drop any call whose `Binder.getCallingUid()` does not match the admitted host UID.
+- The provider's `IEmbedSession.close` and `IGuestChannel.send` drop any call whose `Binder.getCallingUid()` does not match the admitted host UID.
 - The host applies the same check to inbound `send` / `onClosed`.
 
 So even a leaked binder handle cannot drive a session from a different UID. Peer death is handled by `linkToDeath` on both sides, producing a `PEER_DIED` close.
 
 ### Adversarial tests
 
-`:evil-host` (different signing key) and `:evil-provider` are real installable apps used by instrumented tests to prove both directions of rejection: an evil provider is denied by the host with **no bind and no surface**; an evil host is denied by the provider with **no surface built**. A suspending authorizer that yields and then denies is also exercised, to prove the async path fails closed.
+`:evil-host` (different signing key) and `:evil-provider` are real installable apps used by instrumented tests to prove both directions of rejection: an evil provider is denied by the host with **no bind and no window**; an evil host is denied by the provider with **no window added**. A suspending authorizer that yields and then denies is also exercised, to prove the async path fails closed.
 
 ---
 
@@ -226,12 +227,11 @@ interface PipeSession {
     val state: StateFlow<PipeState>       // Connecting | Open(peer) | Closed(cause?)
     val messages: Flow<PipeMessage>       // provider → host
     suspend fun send(message: PipeMessage): Boolean   // host → provider
-    suspend fun resize(size: PipeSize)
     fun close()
 }
 ```
 
-Provider-side, the symmetric handle is `HostHandle` (`peer` + `suspend send`), and the pane itself is a `PipeContent` (`view` + `onMessage` / `onResized` / `onClosed` callbacks). `PipeProviderService.onOpenPane(request, host): PaneResult` returns either `PaneResult.Content(content)` or `PaneResult.Reject(reason)`.
+Provider-side, the symmetric handle is `HostHandle` (`peer` + `suspend send` + `close`, where `close` dismisses the provider's own pane), and the pane itself is a `PipeContent` (`view` + `onMessage` / `onClosed` callbacks). `PipeProviderService.onOpenPane(request, host): PaneResult` returns either `PaneResult.Content(content)` or `PaneResult.Reject(reason)`.
 
 ### Channel guarantees
 
@@ -257,30 +257,24 @@ Sealed hierarchies must be sent as the **supertype** (the codec matches on the e
 
 ---
 
-## 9. Presentation modes
+## 9. The pane window
 
-The provider's `PaneResult.Content` is identical across modes; only the **host container** and the surface size differ. The chosen mode travels in `PipeRequest.presentation`, so a provider *may* adapt its layout, but the host decides.
+The pane is a **real window**, not an embedded surface. On the admitted open, the provider:
 
-| Mode | Host type | Container |
-|---|---|---|
-| `EMBEDDED` | `PipeView` | a `View` in the host's layout |
-| `FULL_SCREEN` | `PipeFullScreen.open(...)` | a full-bleed, inset-padded container added to `android.R.id.content` |
-| `DIALOG` | `PipeDialog.show(...)` | a dimmed scrim + centered card overlay in the host's content view |
+1. Wraps the provider's `PipeContent.view` in a `PaneRoot` (a `FrameLayout` that pads itself by the system-bar insets so content never draws under the status/navigation bars, and turns a BACK key press into a provider-side dismissal).
+2. Builds `WindowManager.LayoutParams` of type `TYPE_APPLICATION_PANEL`, `MATCH_PARENT × MATCH_PARENT`, with `token = OpenSpec.hostToken` (the host activity's window token) and `softInputMode = SOFT_INPUT_ADJUST_RESIZE`.
+3. Calls `WindowManager.addView(paneRoot, params)`.
 
-Full-screen and dialog wrap the same `PipeView` and reuse the same `open()` / `PipeSession` core; they add only host-owned chrome and lifecycle. (`DIALOG` is an in-activity overlay rather than a real `android.app.Dialog`: a second window breaks embedded-`SurfaceControlViewHost` input focus and hides the pane from the accessibility tree. Keeping the pane at the same window-nesting depth as full-screen avoids both.)
+Because the params carry the host's window token, the panel becomes a child window of the host's window in the same task — a genuine window in the host's hierarchy. That is the whole trick, and it is what makes input work uniformly:
 
-### Cross-process input
+- **Focus & touch** — a real focusable window receives input directly, on every API from 30 up. There is no token-transfer, no `transferTouchGesture`, and no host-side touch forwarding. The window accepts unlimited normal gestures.
+- **Soft-keyboard (IME)** — because the window is a real, focusable IME target, tapping an `EditText` in the pane brings up the keyboard and drives a real `InputConnection`, on **every supported API** — the property SCVH could not give below API 35.
+- **BACK** — the pane's window is focusable, so it receives the BACK key; `PaneRoot` intercepts it and dismisses the pane (`PROVIDER_CLOSED`). The host also registers a back-press callback as a fallback for when focus is still on the host.
+- **Insets** — `PaneRoot` applies the system-bar insets as padding, so an edge-to-edge host does not push pane content under the bars.
 
-A plain `SurfaceView` does **not** forward touches into an embedded `SurfaceControlViewHost`; the host must link its input token to the embedded window. Pipe does this two ways, selected by API level, and the choice is baked into `OpenSpec` (which token field is non-null):
+The host side never touches a `Surface`. `PipeConnection` binds the service, runs the host gate, waits for the host activity's window token to be available (`decorView.windowToken`, i.e. the decor view attached), sends the `OpenSpec`, and wires the two channels into the `PipeSession`. `PipeFullScreen.open(...)` layers lifecycle + back-press wiring on top and returns a `Job`.
 
-- **API 35+** — the host passes a public `android.window.InputTransferToken` (`OpenSpec.inputToken`); the provider builds `SurfaceControlViewHost(ctx, display, InputTransferToken)`. Touch is handed across per `ACTION_DOWN` with `WindowManager.transferTouchGesture()` in embedded mode, or — where the pane is the whole surface (full-screen/dialog) — by rendering the surface on top (`setZOrderOnTop(true)`) so it receives input directly.
-- **API 30–34** — there is no public input-token accessor and no `transferTouchGesture`, so Pipe uses **public APIs only**: the host passes its public window token (`View.getWindowToken()`, `OpenSpec.hostToken`), which satisfies `SurfaceControlViewHost`'s host-token requirement so the pane *renders*; the provider builds it with the API-30 `SurfaceControlViewHost(ctx, display, IBinder)` constructor. Touch is then **forwarded**: the host captures `MotionEvent`s on its `SurfaceView` and sends them over `IEmbedSession.dispatchInput`, and the provider dispatches them into the pane's view. No `@hide`, no reflection.
-
-`SurfaceControlViewHost` itself is API 30, which is the library's hard floor; below it there is no cross-process embedding at all (the host degrades to a clean `PipeTransportException`, not a crash — a null host token makes `SurfaceControlViewHost` non-functional pre-35).
-
-**Caveat of the pre-35 path:** touch forwarding covers taps, buttons, and gestures, but not soft-keyboard **IME** — text entry into an embedded field needs the window focus/`InputConnection` that only the API-35 token path establishes. Panes that require IME should target API 35+.
-
-**Embedded-mode note (API 35):** the per-gesture `transferTouchGesture` on API 35 can fail to deliver a *second* gesture in some sequences (e.g. after an intervening host-side tap), so the sample treats an embedded API-35 session as effectively single-interaction and reopens for the next. Full-screen/dialog (direct z-order input) and the API-30–34 host-token path are not affected.
+`minSdk 30` is the floor because the parenting behavior and the `WindowInsets.Type` API this relies on are API 30; below it, there is no supported path (open fails with a clean `PipeTransportException`, not a crash).
 
 ---
 
@@ -288,7 +282,7 @@ A plain `SurfaceView` does **not** forward touches into an embedded `SurfaceCont
 
 A session moves `Connecting → Open → Closed`. `PipeState.Closed(cause)` carries a `null` cause for a clean close and a `PipeException` for a failure. `CloseReason` on the wire is `HOST_CLOSED`, `PROVIDER_CLOSED`, or `PEER_DIED`.
 
-Teardown is **idempotent** and converges from every trigger — host `close()`, provider `Reject`/close, back-press, activity destroy, open timeout, or peer death (`linkToDeath`). The container presentations (`PipeFullScreen`, `PipeDialog`) additionally observe `session.state` and tear their chrome down when the session closes by *any* path, then complete that observer so it does not retain the detached view tree.
+Teardown is **idempotent** and converges from every trigger — host `close()`, provider `Reject`/`HostHandle.close()`, back-press, activity destroy, open timeout, or peer death (`linkToDeath`). Provider-side, closing a pane calls `WindowManager.removeViewImmediate` on its `PaneRoot` and (unless the host initiated it) notifies the host over `IHostChannel.onClosed`. Host-side, `PipeFullScreen` observes `session.state` and drops its lifecycle observer + back callback when the session closes by *any* path, so nothing leaks.
 
 Errors surface as a small `PipeException` hierarchy (`PipeDeniedException`, `PipeTimeoutException`, `PipeTransportException`, …); `PipeError.Code` enumerates `PROVIDER_NOT_FOUND`, `CERT_UNREADABLE`, `VERSION_MISMATCH`, `TIMEOUT`, `TRANSPORT_FAILURE`.
 
@@ -304,25 +298,29 @@ Errors surface as a small `PipeException` hierarchy (`PipeDeniedException`, `Pip
 
 **Defends against:**
 
-- A malicious app impersonating a trusted provider or host — identity is kernel/PackageManager-derived, never self-reported, and checked on both ends before any surface or message crosses.
+- A malicious app impersonating a trusted provider or host — identity is kernel/PackageManager-derived, never self-reported, and checked on both ends before any window is added or message crosses. A host only ever hands its window token to a provider whose signing identity it has verified.
 - A rogue peer driving a session it was not admitted to — every inbound call is UID-gated after open.
-- Provider code executing in the host (or vice versa) — it never does; only a composited surface and typed messages cross.
-- Silent overlay/tapjacking — Pipe uses only sanctioned cross-process UI APIs and no window-token/draw-over side channel; the host controls placement, size, and revocation.
+- Provider code executing in the host (or vice versa) — it never does; only a window (drawn in the provider's own process) and typed messages cross.
+
+**The trade the full-screen model makes:**
+
+- The provider draws a **full-screen window over the host** — a larger on-screen surface than an embedded pane, and dismissing the *visible* window is provider-cooperative (BACK, lifecycle, and `session.close()` all tear it down; the host controls the *binding* unconditionally and can drop it at any time). This is a real overlay, made safe not by withholding the window token but by **only handing it to a cryptographically verified peer** in a closed app family. It is not a tapjacking primitive: both apps opt in, and the host chooses the exact provider it verified.
 
 **Explicitly out of scope:**
 
 - Open, unvetted provider ecosystems. The trust anchor is signing identity (same key or an allowlist); there is no runtime sandbox around arbitrary provider code beyond process isolation.
-- Protecting a provider from a host that legitimately embeds it (the host owns the window it draws into).
-- Devices below API 30 — `SurfaceControlViewHost` does not exist, so there is no cross-process embedding to secure; open fails with a `PipeTransportException`.
+- Protecting a provider from a host that legitimately opens it (the host owns the token the provider's window is parented to).
+- Devices below API 30 — the parenting/inset APIs do not exist, so there is no supported cross-process pane; open fails with a `PipeTransportException`.
 
 ---
 
 ## 13. Known limitations & non-goals
 
-- **`minSdk = 30` (Android 11) — the hard floor.** `SurfaceControlViewHost`, the embedding primitive, is API 30; nothing works below it. **Everything uses public APIs — no `@hide`/reflection** (so it is Play-safe). API 30–34 render with the public window token and forward touch over `IEmbedSession.dispatchInput` (§9); the only gap there is soft-keyboard IME. API 35+ use the public `InputTransferToken` / `transferTouchGesture` path with clean IME and hardware attestation. Verified working end-to-end (full certification round-trip incl. touch into the pane) on API 30 (emulator) and API 36 (Pixel).
-- **Embedded single-gesture-per-session** (§9) — the primary interactive limitation.
+- **`minSdk = 30` (Android 11) — the floor.** The cross-process sub-window (parenting a panel to the host's window token) and the `WindowInsets.Type` API are API 30. **Everything uses public APIs — no `@hide`/reflection** (so it is Play-safe). Full interaction and native IME work across the whole range. Verified working end-to-end (full certification round-trip incl. input into the pane and native IME) on API 30 (emulator) and API 36 (physical Pixel 6 Pro), with the whole instrumented suite green on both.
+- **One full-screen pane.** No embedded, resizable, or multi-instance panes — that was the SCVH design, cut for the reasons in §1. If you need a small in-layout surface, Pipe is not it.
+- **Provider owns the visible window.** The host controls the binding/session but relies on the provider (or BACK/lifecycle) to remove the *view*; see §12.
 - **IPC granularity** — every message is a binder transaction; Pipe suits coarse-grained handoffs, not high-frequency small-message loops.
-- **Per-process cost** — a second process carries a fixed memory/startup tax; "extra heap" is not free, and cold open has real latency (bind + handshake + surface attach).
+- **Per-process cost** — a second process carries a fixed memory/startup tax; "extra heap" is not free, and cold open has real latency (bind + handshake + window add).
 - **Not theme-adaptive out of the box** — sample provider panes paint an explicit background; a real provider owns its own theming.
 - **Maturity** — a coherent, adversarially-tested alpha, not yet a hardened production release.
 
@@ -332,9 +330,9 @@ Errors surface as a small `PipeException` hierarchy (`PipeDeniedException`, `Pip
 
 | To understand… | Start at |
 |---|---|
-| Host open flow, input transfer, teardown | `host/PipeView.kt` |
-| Full-screen / dialog containers | `host/PipeFullScreen.kt`, `host/PipeDialog.kt` |
-| Provider service, surface build, UID-gated callbacks | `provider/PipeProviderService.kt` |
+| Host open flow, gating, channels, teardown | `host/PipeConnection.kt` |
+| Public host entry + lifecycle/back wiring | `host/PipeFullScreen.kt` |
+| Provider service, window add, UID-gated callbacks | `provider/PipeProviderService.kt` |
 | Authorization policy | `auth/PipeAuthorizers.kt`, `auth/PipeAuthorizer.kt` |
 | Identity resolution | `auth/AndroidSigningSource.kt`, `auth/IdentityResolver.kt` |
 | Wire protocol | `transport/*.aidl`, `transport/OpenSpec.kt` |

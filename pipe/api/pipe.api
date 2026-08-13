@@ -185,15 +185,6 @@ public final class tech/ssemaj/pipe/core/PipeMessage$Creator : android/os/Parcel
 	public final fun newArray (I)[Ltech/ssemaj/pipe/core/PipeMessage;
 }
 
-public final class tech/ssemaj/pipe/core/PipePresentation : java/lang/Enum {
-	public static final field DIALOG Ltech/ssemaj/pipe/core/PipePresentation;
-	public static final field EMBEDDED Ltech/ssemaj/pipe/core/PipePresentation;
-	public static final field FULL_SCREEN Ltech/ssemaj/pipe/core/PipePresentation;
-	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public static fun valueOf (Ljava/lang/String;)Ltech/ssemaj/pipe/core/PipePresentation;
-	public static fun values ()[Ltech/ssemaj/pipe/core/PipePresentation;
-}
-
 public final class tech/ssemaj/pipe/core/PipeProviderUnavailableException : tech/ssemaj/pipe/core/PipeException {
 	public fun <init> (Ltech/ssemaj/pipe/core/PipeProviderUnavailableException$Unavailable;)V
 	public final fun getKind ()Ltech/ssemaj/pipe/core/PipeProviderUnavailableException$Unavailable;
@@ -211,18 +202,16 @@ public final class tech/ssemaj/pipe/core/PipeProviderUnavailableException$Unavai
 
 public final class tech/ssemaj/pipe/core/PipeRequest : android/os/Parcelable {
 	public static final field CREATOR Landroid/os/Parcelable$Creator;
-	public fun <init> (Ljava/lang/String;Landroid/os/Bundle;Ltech/ssemaj/pipe/core/PipePresentation;)V
-	public synthetic fun <init> (Ljava/lang/String;Landroid/os/Bundle;Ltech/ssemaj/pipe/core/PipePresentation;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Landroid/os/Bundle;)V
+	public synthetic fun <init> (Ljava/lang/String;Landroid/os/Bundle;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Landroid/os/Bundle;
-	public final fun component3 ()Ltech/ssemaj/pipe/core/PipePresentation;
-	public final fun copy (Ljava/lang/String;Landroid/os/Bundle;Ltech/ssemaj/pipe/core/PipePresentation;)Ltech/ssemaj/pipe/core/PipeRequest;
-	public static synthetic fun copy$default (Ltech/ssemaj/pipe/core/PipeRequest;Ljava/lang/String;Landroid/os/Bundle;Ltech/ssemaj/pipe/core/PipePresentation;ILjava/lang/Object;)Ltech/ssemaj/pipe/core/PipeRequest;
+	public final fun copy (Ljava/lang/String;Landroid/os/Bundle;)Ltech/ssemaj/pipe/core/PipeRequest;
+	public static synthetic fun copy$default (Ltech/ssemaj/pipe/core/PipeRequest;Ljava/lang/String;Landroid/os/Bundle;ILjava/lang/Object;)Ltech/ssemaj/pipe/core/PipeRequest;
 	public final fun describeContents ()I
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAction ()Ljava/lang/String;
 	public final fun getExtras ()Landroid/os/Bundle;
-	public final fun getPresentation ()Ltech/ssemaj/pipe/core/PipePresentation;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 	public final fun writeToParcel (Landroid/os/Parcel;I)V
@@ -234,19 +223,6 @@ public final class tech/ssemaj/pipe/core/PipeRequest$Creator : android/os/Parcel
 	public final fun createFromParcel (Landroid/os/Parcel;)Ltech/ssemaj/pipe/core/PipeRequest;
 	public synthetic fun newArray (I)[Ljava/lang/Object;
 	public final fun newArray (I)[Ltech/ssemaj/pipe/core/PipeRequest;
-}
-
-public final class tech/ssemaj/pipe/core/PipeSize {
-	public fun <init> (II)V
-	public final fun component1 ()I
-	public final fun component2 ()I
-	public final fun copy (II)Ltech/ssemaj/pipe/core/PipeSize;
-	public static synthetic fun copy$default (Ltech/ssemaj/pipe/core/PipeSize;IIILjava/lang/Object;)Ltech/ssemaj/pipe/core/PipeSize;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getHeightPx ()I
-	public final fun getWidthPx ()I
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
 }
 
 public abstract interface class tech/ssemaj/pipe/core/PipeState {
@@ -326,17 +302,6 @@ public final class tech/ssemaj/pipe/host/HostGate {
 	public final fun admit (Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
-public final class tech/ssemaj/pipe/host/PipeDialog {
-	public static final field Companion Ltech/ssemaj/pipe/host/PipeDialog$Companion;
-	public synthetic fun <init> (Landroid/view/ViewGroup;Landroidx/activity/OnBackPressedCallback;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun dismiss ()V
-}
-
-public final class tech/ssemaj/pipe/host/PipeDialog$Companion {
-	public final fun show (Landroidx/activity/ComponentActivity;Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/PipeAuthorizer;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;)Ltech/ssemaj/pipe/host/PipeDialog;
-	public static synthetic fun show$default (Ltech/ssemaj/pipe/host/PipeDialog$Companion;Landroidx/activity/ComponentActivity;Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/PipeAuthorizer;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)Ltech/ssemaj/pipe/host/PipeDialog;
-}
-
 public final class tech/ssemaj/pipe/host/PipeFullScreen {
 	public static final field INSTANCE Ltech/ssemaj/pipe/host/PipeFullScreen;
 	public final fun open (Landroidx/activity/ComponentActivity;Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/PipeAuthorizer;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lkotlinx/coroutines/Job;
@@ -348,20 +313,7 @@ public abstract interface class tech/ssemaj/pipe/host/PipeSession {
 	public abstract fun getMessages ()Lkotlinx/coroutines/flow/Flow;
 	public abstract fun getPeer ()Ltech/ssemaj/pipe/auth/PeerIdentity;
 	public abstract fun getState ()Lkotlinx/coroutines/flow/StateFlow;
-	public abstract fun resize (Ltech/ssemaj/pipe/core/PipeSize;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun send (Ltech/ssemaj/pipe/core/PipeMessage;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-}
-
-public final class tech/ssemaj/pipe/host/PipeView : android/widget/FrameLayout {
-	public fun <init> (Landroid/content/Context;)V
-	public fun <init> (Landroid/content/Context;Landroid/util/AttributeSet;)V
-	public fun <init> (Landroid/content/Context;Landroid/util/AttributeSet;Lkotlinx/coroutines/CoroutineDispatcher;)V
-	public synthetic fun <init> (Landroid/content/Context;Landroid/util/AttributeSet;Lkotlinx/coroutines/CoroutineDispatcher;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun close ()V
-	public final fun open-zkXUZaI (Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/PipeAuthorizer;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun open-zkXUZaI$default (Ltech/ssemaj/pipe/host/PipeView;Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/PipeAuthorizer;JLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public final fun openIn (Landroidx/lifecycle/LifecycleOwner;Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/PipeAuthorizer;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Lkotlinx/coroutines/Job;
-	public static synthetic fun openIn$default (Ltech/ssemaj/pipe/host/PipeView;Landroidx/lifecycle/LifecycleOwner;Ltech/ssemaj/pipe/host/ProviderComponent;Ltech/ssemaj/pipe/core/PipeRequest;Ltech/ssemaj/pipe/auth/PipeAuthorizer;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lkotlinx/coroutines/Job;
 }
 
 public final class tech/ssemaj/pipe/host/ProviderComponent {
@@ -415,6 +367,7 @@ public final class tech/ssemaj/pipe/provider/GateResult$Refused : tech/ssemaj/pi
 }
 
 public abstract interface class tech/ssemaj/pipe/provider/HostHandle {
+	public abstract fun close ()V
 	public abstract fun getPeer ()Ltech/ssemaj/pipe/auth/PeerIdentity;
 	public abstract fun send (Ltech/ssemaj/pipe/core/PipeMessage;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
@@ -448,13 +401,11 @@ public abstract interface class tech/ssemaj/pipe/provider/PipeContent {
 	public abstract fun getView ()Landroid/view/View;
 	public fun onClosed (Ltech/ssemaj/pipe/core/CloseReason;)V
 	public fun onMessage (Ltech/ssemaj/pipe/core/PipeMessage;)V
-	public fun onResized (Ltech/ssemaj/pipe/core/PipeSize;)V
 }
 
 public final class tech/ssemaj/pipe/provider/PipeContent$DefaultImpls {
 	public static fun onClosed (Ltech/ssemaj/pipe/provider/PipeContent;Ltech/ssemaj/pipe/core/CloseReason;)V
 	public static fun onMessage (Ltech/ssemaj/pipe/provider/PipeContent;Ltech/ssemaj/pipe/core/PipeMessage;)V
-	public static fun onResized (Ltech/ssemaj/pipe/provider/PipeContent;Ltech/ssemaj/pipe/core/PipeSize;)V
 }
 
 public abstract class tech/ssemaj/pipe/provider/PipeProviderService : android/app/Service {
@@ -498,16 +449,12 @@ public class tech/ssemaj/pipe/transport/IEmbedProvider$_Parcel {
 public abstract interface class tech/ssemaj/pipe/transport/IEmbedSession : android/os/IInterface {
 	public static final field DESCRIPTOR Ljava/lang/String;
 	public abstract fun close ()V
-	public abstract fun dispatchInput (Landroid/view/MotionEvent;)V
-	public abstract fun resize (II)V
 }
 
 public class tech/ssemaj/pipe/transport/IEmbedSession$Default : tech/ssemaj/pipe/transport/IEmbedSession {
 	public fun <init> ()V
 	public fun asBinder ()Landroid/os/IBinder;
 	public fun close ()V
-	public fun dispatchInput (Landroid/view/MotionEvent;)V
-	public fun resize (II)V
 }
 
 public abstract class tech/ssemaj/pipe/transport/IEmbedSession$Stub : android/os/Binder, tech/ssemaj/pipe/transport/IEmbedSession {
@@ -515,10 +462,6 @@ public abstract class tech/ssemaj/pipe/transport/IEmbedSession$Stub : android/os
 	public fun asBinder ()Landroid/os/IBinder;
 	public static fun asInterface (Landroid/os/IBinder;)Ltech/ssemaj/pipe/transport/IEmbedSession;
 	public fun onTransact (ILandroid/os/Parcel;Landroid/os/Parcel;I)Z
-}
-
-public class tech/ssemaj/pipe/transport/IEmbedSession$_Parcel {
-	public fun <init> ()V
 }
 
 public abstract interface class tech/ssemaj/pipe/transport/IGuestChannel : android/os/IInterface {
@@ -571,7 +514,7 @@ public abstract interface class tech/ssemaj/pipe/transport/IOpenResultCallback :
 	public static final field DESCRIPTOR Ljava/lang/String;
 	public abstract fun onDenied (Ljava/lang/String;)V
 	public abstract fun onError (Ljava/lang/String;)V
-	public abstract fun onOpened (Landroid/view/SurfaceControlViewHost$SurfacePackage;Ltech/ssemaj/pipe/transport/IEmbedSession;Ltech/ssemaj/pipe/transport/IGuestChannel;)V
+	public abstract fun onOpened (Ltech/ssemaj/pipe/transport/IEmbedSession;Ltech/ssemaj/pipe/transport/IGuestChannel;)V
 }
 
 public class tech/ssemaj/pipe/transport/IOpenResultCallback$Default : tech/ssemaj/pipe/transport/IOpenResultCallback {
@@ -579,7 +522,7 @@ public class tech/ssemaj/pipe/transport/IOpenResultCallback$Default : tech/ssema
 	public fun asBinder ()Landroid/os/IBinder;
 	public fun onDenied (Ljava/lang/String;)V
 	public fun onError (Ljava/lang/String;)V
-	public fun onOpened (Landroid/view/SurfaceControlViewHost$SurfacePackage;Ltech/ssemaj/pipe/transport/IEmbedSession;Ltech/ssemaj/pipe/transport/IGuestChannel;)V
+	public fun onOpened (Ltech/ssemaj/pipe/transport/IEmbedSession;Ltech/ssemaj/pipe/transport/IGuestChannel;)V
 }
 
 public abstract class tech/ssemaj/pipe/transport/IOpenResultCallback$Stub : android/os/Binder, tech/ssemaj/pipe/transport/IOpenResultCallback {
@@ -589,31 +532,19 @@ public abstract class tech/ssemaj/pipe/transport/IOpenResultCallback$Stub : andr
 	public fun onTransact (ILandroid/os/Parcel;Landroid/os/Parcel;I)Z
 }
 
-public class tech/ssemaj/pipe/transport/IOpenResultCallback$_Parcel {
-	public fun <init> ()V
-}
-
 public final class tech/ssemaj/pipe/transport/OpenSpec : android/os/Parcelable {
 	public static final field CREATOR Landroid/os/Parcelable$Creator;
-	public fun <init> (Landroid/os/IBinder;Landroid/os/Parcelable;IIILtech/ssemaj/pipe/core/PipeRequest;I)V
+	public fun <init> (Landroid/os/IBinder;Ltech/ssemaj/pipe/core/PipeRequest;I)V
 	public final fun component1 ()Landroid/os/IBinder;
-	public final fun component2 ()Landroid/os/Parcelable;
+	public final fun component2 ()Ltech/ssemaj/pipe/core/PipeRequest;
 	public final fun component3 ()I
-	public final fun component4 ()I
-	public final fun component5 ()I
-	public final fun component6 ()Ltech/ssemaj/pipe/core/PipeRequest;
-	public final fun component7 ()I
-	public final fun copy (Landroid/os/IBinder;Landroid/os/Parcelable;IIILtech/ssemaj/pipe/core/PipeRequest;I)Ltech/ssemaj/pipe/transport/OpenSpec;
-	public static synthetic fun copy$default (Ltech/ssemaj/pipe/transport/OpenSpec;Landroid/os/IBinder;Landroid/os/Parcelable;IIILtech/ssemaj/pipe/core/PipeRequest;IILjava/lang/Object;)Ltech/ssemaj/pipe/transport/OpenSpec;
+	public final fun copy (Landroid/os/IBinder;Ltech/ssemaj/pipe/core/PipeRequest;I)Ltech/ssemaj/pipe/transport/OpenSpec;
+	public static synthetic fun copy$default (Ltech/ssemaj/pipe/transport/OpenSpec;Landroid/os/IBinder;Ltech/ssemaj/pipe/core/PipeRequest;IILjava/lang/Object;)Ltech/ssemaj/pipe/transport/OpenSpec;
 	public final fun describeContents ()I
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getDisplayId ()I
-	public final fun getHeightPx ()I
 	public final fun getHostToken ()Landroid/os/IBinder;
-	public final fun getInputToken ()Landroid/os/Parcelable;
 	public final fun getProtocolVersion ()I
 	public final fun getRequest ()Ltech/ssemaj/pipe/core/PipeRequest;
-	public final fun getWidthPx ()I
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 	public final fun writeToParcel (Landroid/os/Parcel;I)V

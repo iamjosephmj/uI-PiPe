@@ -1,6 +1,5 @@
 package tech.ssemaj.pipe.samplehost
 
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -33,20 +32,13 @@ class MainActivity : ComponentActivity() {
             }
             else -> PipeAuthorizers.sameSigningKey(this)
         }
-        viewModel.setProvider(provider)
+        viewModel.configure(provider, authorizer)
         setContent {
             PipeDemoTheme {
                 val state by viewModel.uiState.collectAsState()
                 CertificationScreen(
                     state = state,
-                    onPaneViewCreated = { view -> viewModel.onPaneViewReady(view, provider, authorizer) },
-                    onRequest = { viewModel.requestCertification(hostDisplayName = "Pipe Sample Host") },
-                    onReopen = viewModel::reopen,
-                    onOpenFullScreen = { viewModel.openFullScreen(this@MainActivity) },
-                    onOpenDialog = { viewModel.openDialog(this@MainActivity) },
-                    onOpenMultiPane = {
-                        startActivity(Intent(this@MainActivity, MultiPaneActivity::class.java))
-                    },
+                    onStart = { viewModel.startCertification(this@MainActivity) },
                 )
             }
         }

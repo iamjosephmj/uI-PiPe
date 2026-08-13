@@ -26,8 +26,4 @@ class CoreV2TypesTest {
         val s = PipeState.Closed(cause = null)
         assertNull(s.cause)
     }
-
-    @Test fun pipeSizeIsValueType() {
-        assertEquals(PipeSize(4, 2), PipeSize(4, 2))
-    }
 }

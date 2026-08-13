@@ -7,7 +7,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import tech.ssemaj.pipe.auth.PeerIdentity
 import tech.ssemaj.pipe.core.PipeMessage
-import tech.ssemaj.pipe.core.PipeSize
 import tech.ssemaj.pipe.core.PipeState
 
 class PipeSessionContractTest {
@@ -16,7 +15,6 @@ class PipeSessionContractTest {
         override val state = MutableStateFlow<PipeState>(PipeState.Open(peer))
         override val messages = emptyFlow<PipeMessage>()
         override suspend fun send(message: PipeMessage) = true
-        override suspend fun resize(size: PipeSize) {}
         override fun close() {}
     }
     @Test fun exposesPeerAndState() = runTest {

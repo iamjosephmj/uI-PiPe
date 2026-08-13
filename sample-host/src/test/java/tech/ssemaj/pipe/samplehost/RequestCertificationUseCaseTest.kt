@@ -15,7 +15,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import tech.ssemaj.pipe.auth.PeerIdentity
 import tech.ssemaj.pipe.core.PipeMessage
-import tech.ssemaj.pipe.core.PipeSize
 import tech.ssemaj.pipe.core.PipeState
 import tech.ssemaj.pipe.host.PipeSession
 import tech.ssemaj.pipe.samples.contract.CertificationRequest
@@ -31,7 +30,6 @@ private class FakeSession : PipeSession {
     override val state: StateFlow<PipeState> = MutableStateFlow<PipeState>(PipeState.Open(peer))
     override val messages: Flow<PipeMessage> = incoming.receiveAsFlow()
     override suspend fun send(message: PipeMessage): Boolean { sent.add(message); return true }
-    override suspend fun resize(size: PipeSize) {}
     override fun close() {}
 }
 

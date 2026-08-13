@@ -32,7 +32,7 @@ class DemoPaneService : PipeProviderService() {
         val themed = ContextThemeWrapper(this, R.style.Theme_PipeProvider)
         val presenter = PanePresenter()
         var lastRequest: CertificationRequest? = null
-        val pad = if (request.presentation == tech.ssemaj.pipe.core.PipePresentation.DIALOG) 24 else 48
+        val pad = 48
 
         fun text(value: String, sizeSp: Float = 14f, bold: Boolean = false) = TextView(themed).apply {
             this.text = value
@@ -60,17 +60,31 @@ class DemoPaneService : PipeProviderService() {
             addView(consentTitle); addView(consentFingerprint); addView(buttons)
         }
         val resultText = text("", 15f, bold = true).apply { visibility = View.GONE }
-        val startOver = MaterialButton(themed).apply {
+        // Children stay visible; the enclosing [finishButtons] controls whether the pair shows.
+        val startOver = MaterialButton(
+            themed, null, com.google.android.material.R.attr.materialButtonOutlinedStyle,
+        ).apply {
             text = "Start over"
-            visibility = View.GONE
             setOnClickListener { lastRequest?.let(presenter::onRequest) }
+        }
+        val done = MaterialButton(themed).apply {
+            text = "Done"
+            // Provider-side dismissal: closes this full-screen pane and returns to the host, which
+            // shows the verified result it already received over the channel.
+            setOnClickListener { host.close() }
+        }
+        val finishButtons = LinearLayout(themed).apply {
+            orientation = LinearLayout.HORIZONTAL
+            visibility = View.GONE
+            addView(startOver, LinearLayout.LayoutParams(0, WRAP, 1f))
+            addView(done, LinearLayout.LayoutParams(0, WRAP, 1f).apply { marginStart = 16 })
         }
         val root = LinearLayout(themed).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             setBackgroundColor(Color.WHITE)
             setPadding(pad, pad, pad, pad)
-            addView(title); addView(caption); addView(consentGroup); addView(resultText); addView(startOver)
+            addView(title); addView(caption); addView(consentGroup); addView(resultText); addView(finishButtons)
         }
 
         // Render presenter state (paneScope is main-thread).
@@ -80,7 +94,7 @@ class DemoPaneService : PipeProviderService() {
                 resultText.visibility =
                     if (state is PanePresenter.State.Issued || state is PanePresenter.State.Declined) View.VISIBLE
                     else View.GONE
-                startOver.visibility =
+                finishButtons.visibility =
                     if (state is PanePresenter.State.Issued || state is PanePresenter.State.Declined) View.VISIBLE
                     else View.GONE
                 when (state) {
