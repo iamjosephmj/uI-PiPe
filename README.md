@@ -155,3 +155,7 @@ Independent per-direction streams. Delivery is **ordered** and **de-duplicated**
 - **One pane, full-screen** — Pipe does exactly one thing: a single full-screen pane. No embedded/resizable/multi-pane surfaces (an earlier `SurfaceControlViewHost` build did; it was cut so IME and input work identically on every API, with no `@hide`).
 - **Coarse-grained** — every message is a binder transaction; great for a pane + occasional messages, not high-frequency loops.
 - **Alpha** — coherent and adversarially tested, not yet a hardened release.
+
+## Contributing
+
+Contributions are welcome — see **[CONTRIBUTING.md](CONTRIBUTING.md)** for how to build, test (unit + connected + `apiCheck`), and submit changes. Security issues in the trust model should be reported privately, not as public issues. Licensed under [Apache-2.0](LICENSE).
