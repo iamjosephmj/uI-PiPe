@@ -262,7 +262,7 @@ Sealed hierarchies must be sent as the **supertype** (the codec matches on the e
 The pane is a **real window**, not an embedded surface. On the admitted open, the provider:
 
 1. Wraps the provider's `PipeContent.view` in a `PaneRoot` (a `FrameLayout` that pads itself by the system-bar insets so content never draws under the status/navigation bars, and turns a BACK key press into a provider-side dismissal).
-2. Builds `WindowManager.LayoutParams` of type `TYPE_APPLICATION_PANEL`, `MATCH_PARENT × MATCH_PARENT`, with `token = OpenSpec.hostToken` (the host activity's window token) and `softInputMode = SOFT_INPUT_ADJUST_RESIZE`.
+2. Builds `WindowManager.LayoutParams` of type `TYPE_APPLICATION_PANEL`, with `token = OpenSpec.hostToken` (the host activity's window token), `softInputMode = SOFT_INPUT_ADJUST_RESIZE`, and the size/format/dim from the provider's [`PaneSpec`](#the-pane-window) — by default a **full-screen transparent** canvas (`MATCH_PARENT × MATCH_PARENT`, `PixelFormat.TRANSLUCENT`).
 3. Calls `WindowManager.addView(paneRoot, params)`.
 
 Because the params carry the host's window token, the panel becomes a child window of the host's window in the same task — a genuine window in the host's hierarchy. That is the whole trick, and it is what makes input work uniformly:
@@ -271,6 +271,8 @@ Because the params carry the host's window token, the panel becomes a child wind
 - **Soft-keyboard (IME)** — because the window is a real, focusable IME target, tapping an `EditText` in the pane brings up the keyboard and drives a real `InputConnection`, on **every supported API** — the property SCVH could not give below API 35.
 - **BACK** — the pane's window is focusable, so it receives the BACK key; `PaneRoot` intercepts it and dismisses the pane (`PROVIDER_CLOSED`). The host also registers a back-press callback as a fallback for when focus is still on the host.
 - **Insets** — `PaneRoot` applies the system-bar insets as padding, so an edge-to-edge host does not push pane content under the bars.
+
+**Shape & motion.** The pane is always a full-screen window; `PaneSpec` on `PaneResult.Content` only sets window-level facts the provider can't draw itself — opacity (`translucent`, default on) and focusability. It intentionally has **no dialog/sheet presets**: because the pane is a transparent full-screen canvas, a dialog, bottom sheet, scrim, or rounded card is just something the **provider draws inside it** (a centered card over a scrim it paints, dismiss-on-scrim-tap it wires) — and animates itself. There is no library transition API: enter/exit animation is the provider's own (in Compose, `AnimatedVisibility`/`animate*AsState`). To make that turnkey, **`PaneRoot` — the window's root view — is a `LifecycleOwner` / `SavedStateRegistryOwner` / `ViewModelStoreOwner`** and installs itself as the ViewTree owner, so a `ComposeView` runs in the pane with no extra wiring even though the window is added from a Service. A transparent pane shows host content behind the provider's drawing (see §12).
 
 The host side never touches a `Surface`. `PipeConnection` binds the service, runs the host gate, waits for the host activity's window token to be available (`decorView.windowToken`, i.e. the decor view attached), sends the `OpenSpec`, and wires the two channels into the `PipeSession`. `PipeFullScreen.open(...)` layers lifecycle + back-press wiring on top and returns a `Job`.
 
@@ -304,7 +306,7 @@ Errors surface as a small `PipeException` hierarchy (`PipeDeniedException`, `Pip
 
 **The trade the full-screen model makes:**
 
-- The provider draws a **full-screen window over the host** — a larger on-screen surface than an embedded pane, and dismissing the *visible* window is provider-cooperative (BACK, lifecycle, and `session.close()` all tear it down; the host controls the *binding* unconditionally and can drop it at any time). This is a real overlay, made safe not by withholding the window token but by **only handing it to a cryptographically verified peer** in a closed app family. It is not a tapjacking primitive: both apps opt in, and the host chooses the exact provider it verified.
+- The provider draws a **window over the host** — full-screen by default, and now **transparent** by default so it can render dialogs/sheets/scrims (§9). That is a larger, and potentially *see-through*, on-screen surface than an embedded pane: a transparent or partial pane leaves host content visible (and, being touch-modal, still consumes input over its bounds). Dismissing the *visible* window is provider-cooperative (BACK, lifecycle, and `session.close()` all tear it down; the host controls the *binding* unconditionally and can drop it at any time). This is a real overlay, made safe not by withholding the window token but by **only handing it to a cryptographically verified peer** in a closed app family. It is not a tapjacking primitive: both apps opt in, and the host chooses the exact provider it verified. Treat any transparent/partial pane (a provider drawing a dialog or sheet inside the canvas) as an explicit opt-in for that trusted relationship.
 
 **Explicitly out of scope:**
 

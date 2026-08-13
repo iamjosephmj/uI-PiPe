@@ -94,28 +94,29 @@ abstract class PipeProviderService : Service() {
             val host = PaneHostHandle(peer, hostChannel)
             when (val result = onOpenPane(spec.request, host)) {
                 is PaneResult.Reject -> ignoringRemote { callback.onDenied(result.reason) }
-                is PaneResult.Content -> mountPane(spec, result.content, hostChannel, host, callback)
+                is PaneResult.Content -> mountPane(spec, result, hostChannel, host, callback)
             }
         } catch (t: Throwable) {
             ignoringRemote { callback.onError("provider failed to open pane: ${t.message}") }
         }
     }
 
-    /** Builds the window, registers the pane, and hands the host its control binders. */
+    /** Builds the window per [result]'s spec, registers the pane, and hands the host its binders. */
     private fun mountPane(
         spec: OpenSpec,
-        content: PipeContent,
+        result: PaneResult.Content,
         hostChannel: IHostChannel,
         host: PaneHostHandle,
         callback: IOpenResultCallback,
     ) {
+        val content = result.content
         val hostBinder = hostChannel.asBinder()
         val match = FrameLayout.LayoutParams.MATCH_PARENT
         val root = PaneRoot(this).apply {
             addView(content.view, FrameLayout.LayoutParams(match, match))
         }
         val windowManager = getSystemService(WindowManager::class.java)
-        windowManager.addPane(root, spec.hostToken)
+        windowManager.addPane(root, spec.hostToken, result.spec)
 
         val pane = ActivePane(
             windowManager, root, content, hostChannel, mainHandler, host.peer.uid,

@@ -60,12 +60,12 @@ internal class ActivePane(
     fun close(reason: CloseReason) {
         if (closed) return
         closed = true
-        ignoringRemote { windowManager.removeViewImmediate(root) }
         content.onClosed(reason)
         // The host already knows when it asked to close; only tell it about closes it didn't start.
         if (reason != CloseReason.HOST_CLOSED) {
             ignoringRemote { hostChannel.onClosed(reason.toWire()) }
         }
         onClosed(this)
+        ignoringRemote { windowManager.removeViewImmediate(root) }
     }
 }

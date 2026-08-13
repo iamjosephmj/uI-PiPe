@@ -1,7 +1,9 @@
 package tech.ssemaj.pipe.sampleprovider
 
-import android.view.ContextThemeWrapper
 import android.view.View
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.ComposeView
 import kotlinx.coroutines.launch
 import tech.ssemaj.pipe.core.PipeMessage
 import tech.ssemaj.pipe.core.PipeRequest
@@ -13,18 +15,18 @@ import tech.ssemaj.pipe.samples.contract.CertificationRequest
 import tech.ssemaj.pipe.samples.contract.CertificationResponse
 import tech.ssemaj.pipe.sampleprovider.data.KeystoreRepository
 import tech.ssemaj.pipe.sampleprovider.domain.IssueCertificationUseCase
-import tech.ssemaj.pipe.sampleprovider.pane.ConsentPaneView
+import tech.ssemaj.pipe.sampleprovider.pane.ConsentSheet
 import tech.ssemaj.pipe.sampleprovider.pane.PanePresenter
 import tech.ssemaj.pipe.serialization.PipeCodec
 import tech.ssemaj.pipe.serialization.send
 
 /**
- * Sample provider: renders a consent pane and, on approval, signs the host's challenge with a
- * hardware-backed AndroidKeyStore key. It wires three collaborators together and holds no view or
- * crypto logic itself:
- *  - [ConsentPaneView] — the view (display + clicks),
- *  - [PanePresenter] — the pane's UI state machine,
- *  - [IssueCertificationUseCase] — the attestation signing.
+ * Sample provider: renders the consent flow as a **Compose bottom sheet drawn inside the pane**.
+ *
+ * The pane is the library's default — a full-screen transparent window — and everything the user
+ * sees (scrim, bottom-anchored card, buttons, dismiss) is composed here in [ConsentSheet]; the
+ * library knows nothing about "sheet". `ComposeView` works with nothing extra because the pane's
+ * `PaneRoot` is a lifecycle/saved-state/viewmodel owner, so a Compose pane just drops in.
  */
 class DemoPaneService : PipeProviderService() {
 
@@ -32,38 +34,45 @@ class DemoPaneService : PipeProviderService() {
 
     override suspend fun onOpenPane(request: PipeRequest, host: HostHandle): PaneResult {
         val presenter = PanePresenter()
-        val pane = ConsentPaneView(ContextThemeWrapper(this, R.style.Theme_PipeProvider))
         var lastRequest: CertificationRequest? = null
 
-        pane.onApprove = {
-            (presenter.state.value as? PanePresenter.State.Consent)?.let { consent ->
-                paneScope.launch {
-                    val granted = issueCertification(consent.nonce)
-                    host.send<CertificationResponse>(granted)
-                    presenter.onIssued(granted.securityLevel)
-                }
+        val composeView = ComposeView(this).apply {
+            setContent {
+                val state by presenter.state.collectAsState()
+                ConsentSheet(
+                    state = state,
+                    onApprove = {
+                        (presenter.state.value as? PanePresenter.State.Consent)?.let { consent ->
+                            paneScope.launch {
+                                val granted = issueCertification(consent.nonce)
+                                host.send<CertificationResponse>(granted)
+                                presenter.onIssued(granted.securityLevel)
+                            }
+                        }
+                    },
+                    onDecline = {
+                        paneScope.launch {
+                            host.send<CertificationResponse>(CertificationResponse.Declined("user declined"))
+                            presenter.onDeclined("user declined")
+                        }
+                    },
+                    onStartOver = { lastRequest?.let(presenter::onRequest) },
+                    onDone = { host.close() },
+                    onDismiss = { host.close() },
+                )
             }
         }
-        pane.onDecline = {
-            paneScope.launch {
-                host.send<CertificationResponse>(CertificationResponse.Declined("user declined"))
-                presenter.onDeclined("user declined")
-            }
-        }
-        pane.onStartOver = { lastRequest?.let(presenter::onRequest) }
-        pane.onDone = { host.close() }
 
-        // Render presenter state (paneScope is main-thread).
-        paneScope.launch { presenter.state.collect(pane::render) }
-
-        return PaneResult.Content(object : PipeContent {
-            override val view: View = pane.view
+        val content = object : PipeContent {
+            override val view: View = composeView
             override fun onMessage(message: PipeMessage) {
                 PipeCodec.decodeOrNull<CertificationRequest>(message)?.let { req ->
                     lastRequest = req
                     presenter.onRequest(req)
                 }
             }
-        })
+        }
+        // Full-screen transparent pane (the default). The dialog animates itself in (see ConsentDialog).
+        return PaneResult.Content(content)
     }
 }

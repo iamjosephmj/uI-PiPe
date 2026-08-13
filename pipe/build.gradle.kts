@@ -23,6 +23,9 @@ dependencies {
     api(libs.androidx.activity)
     implementation(libs.coroutines.android)
     implementation(libs.androidx.lifecycle.runtime)
+    // PaneRoot is a Lifecycle/SavedState/ViewModelStore owner so Compose panes work out of the box.
+    implementation(libs.lifecycle.viewmodel)
+    implementation(libs.savedstate)
     implementation("androidx.annotation:annotation:1.9.1")
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)

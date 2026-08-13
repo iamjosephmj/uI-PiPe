@@ -67,7 +67,14 @@ class PaneService : PipeProviderService() {
 }
 ```
 
-Runs on the provider's main thread, only after the host clears the provider's gate. The pane is a full-screen window the library adds over the host; BACK dismisses it, and `host.close()` lets the provider dismiss it too. Override `authorizer()` to change who may open it. Manifest: an exported `<service>` with the `tech.ssemaj.pipe.action.OPEN_PANE` action.
+Runs on the provider's main thread, only after the host clears the provider's gate. The pane is a window the library adds over the host — **full-screen and transparent by default** — so a dialog, a bottom sheet, or a scrim is just something *you draw and animate inside it* (a centered card over your own scrim, etc.). The library only gives you the canvas:
+
+```kotlin
+PaneResult.Content(content)                                // default: full-screen transparent
+PaneResult.Content(content, PaneSpec(translucent = false)) // opaque full-screen instead
+```
+
+Because the pane's root is a lifecycle/saved-state/viewmodel owner, you can drop a `ComposeView` straight in and animate the entrance with Compose — the sample provider renders its consent flow as a Compose dialog. BACK dismisses the pane, and `host.close()` lets the provider dismiss it too. Override `authorizer()` to change who may open it. Manifest: an exported `<service>` with the `tech.ssemaj.pipe.action.OPEN_PANE` action.
 
 ## Trust & authorization
 
@@ -109,7 +116,7 @@ Independent per-direction streams. Delivery is **ordered** and **de-duplicated**
 ## Known limitations
 
 - **`minSdk 30`** (Android 11) — the floor for the cross-process sub-window and the auth stack. **Public APIs only, no `@hide`/reflection** (Play-safe). Full interaction and native IME work across the whole range; verified end-to-end on API 30 and API 36.
-- **Provider owns a full-screen window over the host** — a larger on-screen surface than an embedded pane, and dismissing the *visible* window is provider-cooperative (BACK/lifecycle/`session.close()` all tear it down; the host fully controls the binding either way). The identity gate is what makes handing over the window token safe — see [Trust & authorization](#trust--authorization).
+- **Provider owns the window over the host** — full-screen and transparent by default, so a pane can be see-through (dialogs/sheets show host content behind them) while still consuming input over its bounds. That's a larger surface than an embedded pane; dismissing the *visible* window is provider-cooperative (BACK/lifecycle/`session.close()` all tear it down; the host fully controls the binding either way). The identity gate is what makes handing over the window token safe — see [Trust & authorization](#trust--authorization).
 - **One pane, full-screen** — Pipe does exactly one thing: a single full-screen pane. No embedded/resizable/multi-pane surfaces (an earlier `SurfaceControlViewHost` build did; it was cut so IME and input work identically on every API, with no `@hide`).
 - **Coarse-grained** — every message is a binder transaction; great for a pane + occasional messages, not high-frequency loops.
 - **Alpha** — coherent and adversarially tested, not yet a hardened release.

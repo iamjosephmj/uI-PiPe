@@ -376,12 +376,15 @@ public abstract interface class tech/ssemaj/pipe/provider/PaneResult {
 }
 
 public final class tech/ssemaj/pipe/provider/PaneResult$Content : tech/ssemaj/pipe/provider/PaneResult {
-	public fun <init> (Ltech/ssemaj/pipe/provider/PipeContent;)V
+	public fun <init> (Ltech/ssemaj/pipe/provider/PipeContent;Ltech/ssemaj/pipe/provider/PaneSpec;)V
+	public synthetic fun <init> (Ltech/ssemaj/pipe/provider/PipeContent;Ltech/ssemaj/pipe/provider/PaneSpec;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ltech/ssemaj/pipe/provider/PipeContent;
-	public final fun copy (Ltech/ssemaj/pipe/provider/PipeContent;)Ltech/ssemaj/pipe/provider/PaneResult$Content;
-	public static synthetic fun copy$default (Ltech/ssemaj/pipe/provider/PaneResult$Content;Ltech/ssemaj/pipe/provider/PipeContent;ILjava/lang/Object;)Ltech/ssemaj/pipe/provider/PaneResult$Content;
+	public final fun component2 ()Ltech/ssemaj/pipe/provider/PaneSpec;
+	public final fun copy (Ltech/ssemaj/pipe/provider/PipeContent;Ltech/ssemaj/pipe/provider/PaneSpec;)Ltech/ssemaj/pipe/provider/PaneResult$Content;
+	public static synthetic fun copy$default (Ltech/ssemaj/pipe/provider/PaneResult$Content;Ltech/ssemaj/pipe/provider/PipeContent;Ltech/ssemaj/pipe/provider/PaneSpec;ILjava/lang/Object;)Ltech/ssemaj/pipe/provider/PaneResult$Content;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getContent ()Ltech/ssemaj/pipe/provider/PipeContent;
+	public final fun getSpec ()Ltech/ssemaj/pipe/provider/PaneSpec;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -393,6 +396,21 @@ public final class tech/ssemaj/pipe/provider/PaneResult$Reject : tech/ssemaj/pip
 	public static synthetic fun copy$default (Ltech/ssemaj/pipe/provider/PaneResult$Reject;Ljava/lang/String;ILjava/lang/Object;)Ltech/ssemaj/pipe/provider/PaneResult$Reject;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class tech/ssemaj/pipe/provider/PaneSpec {
+	public fun <init> ()V
+	public fun <init> (ZZ)V
+	public synthetic fun <init> (ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Z
+	public final fun component2 ()Z
+	public final fun copy (ZZ)Ltech/ssemaj/pipe/provider/PaneSpec;
+	public static synthetic fun copy$default (Ltech/ssemaj/pipe/provider/PaneSpec;ZZILjava/lang/Object;)Ltech/ssemaj/pipe/provider/PaneSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFocusable ()Z
+	public final fun getTranslucent ()Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
