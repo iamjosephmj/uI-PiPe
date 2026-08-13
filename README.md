@@ -28,9 +28,25 @@ Every open is a mutual, cryptographically-gated handshake — identity is kernel
 
 ## Install
 
+[![](https://jitpack.io/v/iamjosephmj/uI-PiPe.svg)](https://jitpack.io/#iamjosephmj/uI-PiPe)
+
+Available via [JitPack](https://jitpack.io/#iamjosephmj/uI-PiPe). Add the repository:
+
 ```kotlin
-implementation("tech.ssemaj.pipe:pipe:1.0.0-alpha01")
-implementation("tech.ssemaj.pipe:pipe-serialization:1.0.0-alpha01") // optional: typed messages
+// settings.gradle.kts
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+        maven("https://jitpack.io")
+    }
+}
+```
+
+Then the dependency:
+
+```kotlin
+implementation("com.github.iamjosephmj.uI-PiPe:pipe:1.0.0-alpha01")
+implementation("com.github.iamjosephmj.uI-PiPe:pipe-serialization:1.0.0-alpha01") // optional: typed messages
 ```
 
 ## Host
