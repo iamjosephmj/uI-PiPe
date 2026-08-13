@@ -2,11 +2,17 @@
 
 <p align="center">
   <a href="https://jitpack.io/#iamjosephmj/uI-PiPe"><img src="https://jitpack.io/v/iamjosephmj/uI-PiPe.svg" alt="JitPack"></a>
+  <a href="https://github.com/iamjosephmj/uI-PiPe/actions/workflows/ci.yml"><img src="https://github.com/iamjosephmj/uI-PiPe/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"></a>
   <img src="https://img.shields.io/badge/minSdk-30-3CB043" alt="minSdk 30">
   <img src="https://img.shields.io/badge/Kotlin-Android-5C94FC" alt="Kotlin Android">
 </p>
 
 **One app's live screen, rendered inside another app — across the process boundary, and verified.**
+
+<!-- Demo GIF — record a 15–30s capture of the sample flow (host → bottom-sheet consent → Approve → Hardware-verified), save as docs/media/demo.gif, and uncomment:
+<p align="center"><img src="docs/media/demo.gif" width="320" alt="uI-PiPe live demo"></p>
+-->
 
 App&nbsp;A (the *host*) hands its window to App&nbsp;B (the *provider*), and App&nbsp;B draws its own real, full-screen UI **right inside App&nbsp;A's window**, from a separate process. On screen it's seamless — nothing tells the user a second app is drawing it. Yet the two apps never share code or memory, and App&nbsp;A only ever lets an App&nbsp;B it has **cryptographically verified** take over its window.
 
@@ -31,6 +37,15 @@ The sample apps run a real cross-process certification: the host requests certif
 Every open is a mutual, cryptographically-gated handshake — identity is kernel/PackageManager-derived on both ends, never self-reported, and a denial produces no bind and no window.
 
 <p align="center"><img src="docs/media/handshake.svg" width="760" alt="Handshake: host verifies + authorizes, binds and calls open() with its window token; provider reads caller UID, authorizes, adds its full-screen window"></p>
+
+## Use cases
+
+- **Third-party / SDK UI you don't want in your process** — a vendor ships a screen you render in *their* process; their crash, jank, or memory can't touch your app, and their code never runs in yours.
+- **Super-app mini-apps & plugins** — host a partner's screen inside your app, locked to their exact signing key.
+- **Verified partner flows** — payment, identity, consent, or attestation UIs where the host must *prove who is drawing* before it hands over the screen.
+- **On-device consent with hardware attestation** — exactly the sample: the provider signs a challenge with an AndroidKeyStore key, the host verifies the chain.
+
+**Not for** an open marketplace of arbitrary providers — the trust anchor is signing identity (same key or an allowlist), aimed at a closed app family / vetted partners.
 
 ## Install
 
