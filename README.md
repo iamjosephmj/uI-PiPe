@@ -2,6 +2,8 @@
 
 One Android app renders a **live, interactive UI inside another app's window** — across a process boundary, with a signing-identity check on both ends.
 
+<p align="center"><img src="docs/media/pipe.svg" width="760" alt="A plumbing pipe between a Host app and a Provider process, with packets flowing both ways through it"></p>
+
 > **Two processes. Two of everything the runtime gives you** — two UI threads, two render threads, two heaps and two GCs. A whole second runtime working for you, isolated from yours. *(Isolation, not extra CPU — both runtimes still share the device's cores.)*
 
 <p align="center"><img src="docs/media/isolation.svg" width="760" alt="Two processes: two main threads, two render threads, two heaps and GCs, connected by a verified binder channel"></p>
