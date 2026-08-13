@@ -27,7 +27,8 @@ Under the hood, App&nbsp;A's activity hands its **window token** to App&nbsp;B, 
 
 The sample apps run a real cross-process certification: the host requests certification, the provider renders a consent pane *in its own process*, signs a challenge nonce with an AndroidKeyStore key, and the host verifies the attestation chain — the pane is the provider's own full-screen window over the host.
 
-<p align="center"><img src="docs/media/flow.svg" width="760" alt="A live certification: pane-ready → consent with Approve → verifying → Hardware-verified, with the nonce and signed response crossing between host and provider"></p>
+<p align="center"><img src="docs/media/in-action.png" width="760" alt="Two Pixel 6 Pro screens: the provider's consent bottom sheet drawn inside the host (host dimmed behind it), and the host showing the signed attestation Hardware-verified"></p>
+<p align="center"><em>On a Pixel 6 Pro — left: the provider's consent sheet, drawn <b>inside</b> the host (dimmed behind it). Right: the signed attestation, hardware-verified back in the host.</em></p>
 
 ## How it works
 
