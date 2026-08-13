@@ -498,6 +498,7 @@ public class tech/ssemaj/pipe/transport/IEmbedProvider$_Parcel {
 public abstract interface class tech/ssemaj/pipe/transport/IEmbedSession : android/os/IInterface {
 	public static final field DESCRIPTOR Ljava/lang/String;
 	public abstract fun close ()V
+	public abstract fun dispatchInput (Landroid/view/MotionEvent;)V
 	public abstract fun resize (II)V
 }
 
@@ -505,6 +506,7 @@ public class tech/ssemaj/pipe/transport/IEmbedSession$Default : tech/ssemaj/pipe
 	public fun <init> ()V
 	public fun asBinder ()Landroid/os/IBinder;
 	public fun close ()V
+	public fun dispatchInput (Landroid/view/MotionEvent;)V
 	public fun resize (II)V
 }
 
@@ -513,6 +515,10 @@ public abstract class tech/ssemaj/pipe/transport/IEmbedSession$Stub : android/os
 	public fun asBinder ()Landroid/os/IBinder;
 	public static fun asInterface (Landroid/os/IBinder;)Ltech/ssemaj/pipe/transport/IEmbedSession;
 	public fun onTransact (ILandroid/os/Parcel;Landroid/os/Parcel;I)Z
+}
+
+public class tech/ssemaj/pipe/transport/IEmbedSession$_Parcel {
+	public fun <init> ()V
 }
 
 public abstract interface class tech/ssemaj/pipe/transport/IGuestChannel : android/os/IInterface {

@@ -119,7 +119,7 @@ Independent per-direction streams. Delivery is **ordered** and **de-duplicated**
 
 ## Known limitations
 
-- **`minSdk 30`** — the hard floor: `SurfaceControlViewHost` (the embedding primitive) is API 30, so nothing works below it. Input takes two paths: **API 35+** uses the public `InputTransferToken` / `transferTouchGesture` (and clean IME); **API 30–34** passes the host input token (`SurfaceView.getHostToken()`, a **reflected `@hide` method**) to the provider's `SurfaceControlViewHost(Context, Display, IBinder)` constructor and z-orders the surface to route touch. That hidden call is greylisted (works on stock 30–34) but is non-SDK — it could be restricted on some OEM/future builds; IME is also weaker before 35.
+- **`minSdk 30`** — the hard floor: `SurfaceControlViewHost` (the embedding primitive) is API 30, so nothing works below it. **Public APIs only, no `@hide`/reflection.** Input takes two paths: **API 35+** uses the public `InputTransferToken` / `transferTouchGesture` (and clean IME); **API 30–34** renders with the public window token and forwards touch host→provider over the channel (`IEmbedSession.dispatchInput`) — taps and buttons work, but soft-keyboard **IME** does not (that needs the API-35 token path).
 - **Embedded gestures on API 35** — in embedded mode on API 35 the per-gesture `transferTouchGesture` can drop repeated taps in some sequences; the sample reopens per interaction. Full-screen, dialog, and the API-30–34 path (which use direct/host-token input) are unaffected.
 - **Coarse-grained** — every message is a binder transaction; great for pane + occasional messages, not high-frequency loops.
 - **Alpha** — coherent and adversarially tested, not yet a hardened release.

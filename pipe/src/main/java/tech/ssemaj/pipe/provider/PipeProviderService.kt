@@ -174,6 +174,13 @@ abstract class PipeProviderService : Service() {
                 if (callerUidMismatch()) return
                 handler.post { close(CloseReason.HOST_CLOSED) }
             }
+            override fun dispatchInput(event: android.view.MotionEvent) {
+                if (callerUidMismatch()) return
+                handler.post {
+                    if (!closed) content.view.dispatchTouchEvent(event)
+                    runCatching { event.recycle() }
+                }
+            }
         }
 
         val guestChannel = object : IGuestChannel.Stub() {

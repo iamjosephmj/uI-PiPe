@@ -115,22 +115,22 @@ class PipeView @JvmOverloads constructor(
         // top via setZOrderOnTop and receives input directly, so it accepts repeated gestures
         // without depending on per-gesture transfer.
         surfaceView.setOnTouchListener { _, event ->
-            // Only API 35+ needs (and has) transferTouchGesture. On API 30–34 the embedded pane is
-            // linked via the host input token at construction and receives touch directly.
-            if (API35 && !directInput && event.actionMasked == MotionEvent.ACTION_DOWN) {
-                val embedded = embeddedInputToken
-                val hostToken = surfaceView.rootSurfaceControl?.inputTransferToken
-                if (embedded != null && hostToken != null) {
-                    runCatching { windowManager?.transferTouchGesture(hostToken, embedded) }
-                        .onSuccess { transferred ->
-                            if (transferred == false) {
-                                Log.w(TAG, "transferTouchGesture returned false; pane may not receive touch")
-                            }
-                        }
-                        .onFailure { t -> Log.w(TAG, "transferTouchGesture threw; pane may not receive touch", t) }
+            if (API35) {
+                // Public path: hand the current gesture to the embedded pane on ACTION_DOWN.
+                if (!directInput && event.actionMasked == MotionEvent.ACTION_DOWN) {
+                    val embedded = embeddedInputToken
+                    val hostToken = surfaceView.rootSurfaceControl?.inputTransferToken
+                    if (embedded != null && hostToken != null) {
+                        runCatching { windowManager?.transferTouchGesture(hostToken, embedded) }
+                            .onFailure { t -> Log.w(TAG, "transferTouchGesture threw; pane may not receive touch", t) }
+                    }
                 }
+                false
+            } else {
+                // API 30–34: no public input-token path exists, so forward the event to the
+                // provider (public API), which dispatches it into the pane. Consume it here.
+                current?.forwardInput(event) == true
             }
-            false
         }
     }
 
@@ -150,10 +150,7 @@ class PipeView @JvmOverloads constructor(
         val deferred = CompletableDeferred<PipeSession>()
         val attempt = OpenAttempt(provider, request, deferred)
         current = attempt
-        // Non-embedded panes always take input directly (surface on top). On API < 35 there is no
-        // transferTouchGesture, so embedded panes must do the same to receive touch at all — the
-        // host-token link plus a top-ordered surface routes input straight to the embedded window.
-        if (request.presentation != PipePresentation.EMBEDDED || !API35) {
+        if (request.presentation != PipePresentation.EMBEDDED) {
             directInput = true
             surfaceView.setZOrderOnTop(true)
         }
@@ -302,42 +299,35 @@ class PipeView @JvmOverloads constructor(
         private fun sendOpen(remote: IEmbedProvider) {
             if (closed) return
             try {
-                val spec = if (API35) {
-                    val token = surfaceView.rootSurfaceControl?.inputTransferToken
+                // API 35+ carries the public InputTransferToken; API 30–34 carries no token (input
+                // is forwarded over IEmbedSession.dispatchInput — there is no public pre-35 token).
+                val inputToken: android.os.Parcelable? = if (API35) {
+                    surfaceView.rootSurfaceControl?.inputTransferToken
                         ?: throw IllegalStateException("no inputTransferToken; view not attached")
-                    newSpec(hostToken = null, inputToken = token)
                 } else {
-                    val host = hostInputTokenPre35()
-                        ?: throw IllegalStateException("no pre-35 host input token (getHostToken unavailable)")
-                    newSpec(hostToken = host, inputToken = null)
+                    null
                 }
+                // API 30–34: the public window token satisfies SurfaceControlViewHost's host-token
+                // requirement (so the pane renders); touch is delivered via input forwarding below.
+                val spec = OpenSpec(
+                    hostToken = if (API35) null else windowToken,
+                    inputToken = inputToken,
+                    displayId = display.displayId,
+                    widthPx = width.coerceAtLeast(1),
+                    heightPx = height.coerceAtLeast(1),
+                    request = request,
+                    protocolVersion = Protocol.VERSION,
+                )
                 remote.open(spec, hostChannelStub, openCallbackStub)
             } catch (t: Throwable) {
                 terminate(PipeTransportException("open() failed: ${t.message}", t))
             }
         }
 
-        private fun newSpec(hostToken: IBinder?, inputToken: android.os.Parcelable?) = OpenSpec(
-            hostToken = hostToken,
-            inputToken = inputToken,
-            displayId = display.displayId,
-            widthPx = width.coerceAtLeast(1),
-            heightPx = height.coerceAtLeast(1),
-            request = request,
-            protocolVersion = Protocol.VERSION,
-        )
-
-        /**
-         * The host input token on API 30–34. `SurfaceView.getHostToken()` is `@hide` before API 35,
-         * so it is reached by reflection; if non-SDK restrictions block it, falls back to the
-         * window token. Returns null only if neither is available.
-         */
-        private fun hostInputTokenPre35(): IBinder? {
-            runCatching {
-                val m = SurfaceView::class.java.getDeclaredMethod("getHostToken").apply { isAccessible = true }
-                (m.invoke(surfaceView) as? IBinder)?.let { return it }
-            }.onFailure { Log.w(TAG, "getHostToken() unavailable; falling back to windowToken", it) }
-            return windowToken
+        /** API 30–34 input path: forward a host-captured touch to the provider's pane. */
+        fun forwardInput(event: MotionEvent): Boolean {
+            val s = remoteSession ?: return false
+            return runCatching { s.dispatchInput(MotionEvent.obtain(event)); true }.getOrDefault(false)
         }
 
         /** Uid captured at gate time; -1 means unresolvable, so the check is skipped. */
