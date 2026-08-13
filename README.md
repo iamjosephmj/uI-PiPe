@@ -10,13 +10,10 @@
 
 **One app's live screen, rendered inside another app — across the process boundary, and verified.**
 
-<!-- Demo GIF — record a 15–30s capture of the sample flow (host → bottom-sheet consent → Approve → Hardware-verified), save as docs/media/demo.gif, and uncomment:
-<p align="center"><img src="docs/media/demo.gif" width="320" alt="uI-PiPe live demo"></p>
--->
-
 App&nbsp;A (the *host*) hands its window to App&nbsp;B (the *provider*), and App&nbsp;B draws its own real, full-screen UI **right inside App&nbsp;A's window**, from a separate process. On screen it's seamless — nothing tells the user a second app is drawing it. Yet the two apps never share code or memory, and App&nbsp;A only ever lets an App&nbsp;B it has **cryptographically verified** take over its window.
 
-<p align="center"><img src="docs/media/pipe.svg" width="760" alt="App A (host) and App B (provider), two separate processes, joined by one verified pipe — App B's window renders inside App A"></p>
+<p align="center"><img src="docs/media/demo.gif" width="300" alt="uI-PiPe on a Pixel 6 Pro: the host requests certification, the provider's consent bottom sheet appears inside the host, Approve, then the signed attestation is hardware-verified back in the host"></p>
+<p align="center"><em>Running on a Pixel 6 Pro: host → the provider's consent sheet <b>inside</b> the host → Approve → hardware-verified back in the host.</em></p>
 
 > **Two processes. Two of everything the runtime gives you** — two UI threads, two render threads, two heaps and two GCs. A whole second runtime working for you, isolated from yours. *(Isolation, not extra CPU — both runtimes still share the device's cores.)*
 
