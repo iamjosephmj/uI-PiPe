@@ -1,14 +1,16 @@
 # <img src="docs/media/logo.svg" width="46" align="top" alt="uI-PiPe logo"> uI-PiPe
 
-One Android app renders a **live, interactive full-screen UI over another app's window** — across a process boundary, with a signing-identity check on both ends.
+**One app's live screen, rendered inside another app — across the process boundary, and verified.**
 
-<p align="center"><img src="docs/media/pipe.svg" width="760" alt="A plumbing pipe between a Host app and a Provider process, with packets flowing both ways through it"></p>
+App&nbsp;A (the *host*) hands its window to App&nbsp;B (the *provider*), and App&nbsp;B draws its own real, full-screen UI **right inside App&nbsp;A's window**, from a separate process. On screen it's seamless — nothing tells the user a second app is drawing it. Yet the two apps never share code or memory, and App&nbsp;A only ever lets an App&nbsp;B it has **cryptographically verified** take over its window.
+
+<p align="center"><img src="docs/media/pipe.svg" width="760" alt="App A (host) and App B (provider), two separate processes, joined by one verified pipe — App B's window renders inside App A"></p>
 
 > **Two processes. Two of everything the runtime gives you** — two UI threads, two render threads, two heaps and two GCs. A whole second runtime working for you, isolated from yours. *(Isolation, not extra CPU — both runtimes still share the device's cores.)*
 
 <p align="center"><img src="docs/media/isolation.svg" width="760" alt="Two processes: two main threads, two render threads, two heaps and GCs, connected by a verified binder channel"></p>
 
-A *host* activity hands its window token to a *provider*; the provider draws a `View` as a **real full-screen window** over the host, in its own process, with a two-way typed channel between them. Host jank never stalls the pane, a provider crash can't take down the host, and neither app's code runs in the other. Because the pane is a genuine window in the host's hierarchy, it is a first-class focus / **soft-keyboard (IME)** / input target on every supported API — no `SurfaceControlViewHost`, no `@hide` APIs.
+Under the hood, App&nbsp;A's activity hands its **window token** to App&nbsp;B, which adds its `View` as a **real full-screen window** inside App&nbsp;A's own window hierarchy — plus a two-way typed channel between them. App&nbsp;A's jank never stalls it, an App&nbsp;B crash can't take down App&nbsp;A, and neither app's code runs in the other. And because it's a genuine window — not a screenshot, a WebView, or a `RemoteViews` — it's a first-class focus / **soft-keyboard (IME)** / input target on every supported API, with no `SurfaceControlViewHost` and no `@hide` APIs.
 
 **Status:** first release (`1.0.0-alpha01`). Android 11+ (`minSdk 30`). Targets a closed app family / vetted partners, not an open marketplace. Deep dive: **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
