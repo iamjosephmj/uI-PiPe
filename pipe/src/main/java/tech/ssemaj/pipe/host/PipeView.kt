@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Binder
+import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -67,6 +68,9 @@ import tech.ssemaj.pipe.transport.Protocol
 
 private const val TAG = "PipeView"
 
+/** API 35 gates the public InputTransferToken/transferTouchGesture path; below it uses host tokens. */
+private val API35 = Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM
+
 /**
  * Maps a [GateResult.Failed] message (host-side gate, or a provider-side onError string —
  * both funnel through here) to the typed [PipeException] callers see.
@@ -111,7 +115,9 @@ class PipeView @JvmOverloads constructor(
         // top via setZOrderOnTop and receives input directly, so it accepts repeated gestures
         // without depending on per-gesture transfer.
         surfaceView.setOnTouchListener { _, event ->
-            if (!directInput && event.actionMasked == MotionEvent.ACTION_DOWN) {
+            // Only API 35+ needs (and has) transferTouchGesture. On API 30–34 the embedded pane is
+            // linked via the host input token at construction and receives touch directly.
+            if (API35 && !directInput && event.actionMasked == MotionEvent.ACTION_DOWN) {
                 val embedded = embeddedInputToken
                 val hostToken = surfaceView.rootSurfaceControl?.inputTransferToken
                 if (embedded != null && hostToken != null) {
@@ -144,7 +150,10 @@ class PipeView @JvmOverloads constructor(
         val deferred = CompletableDeferred<PipeSession>()
         val attempt = OpenAttempt(provider, request, deferred)
         current = attempt
-        if (request.presentation != PipePresentation.EMBEDDED) {
+        // Non-embedded panes always take input directly (surface on top). On API < 35 there is no
+        // transferTouchGesture, so embedded panes must do the same to receive touch at all — the
+        // host-token link plus a top-ordered surface routes input straight to the embedded window.
+        if (request.presentation != PipePresentation.EMBEDDED || !API35) {
             directInput = true
             surfaceView.setZOrderOnTop(true)
         }
@@ -283,29 +292,52 @@ class PipeView @JvmOverloads constructor(
             }
         }
 
-        /** Wait until the SurfaceView is attached so rootSurfaceControl/token exist. */
+        /** Wait until the SurfaceView is attached so the host input token can be obtained. */
         private fun whenAttached(block: () -> Unit) {
-            if (isAttachedToWindow && surfaceView.rootSurfaceControl != null) { mainHandler.post { block() }; return }
+            val ready = if (API35) surfaceView.rootSurfaceControl != null else windowToken != null
+            if (isAttachedToWindow && ready) { mainHandler.post { block() }; return }
             surfaceView.post { whenAttached(block) }
         }
 
         private fun sendOpen(remote: IEmbedProvider) {
             if (closed) return
             try {
-                val token = surfaceView.rootSurfaceControl?.inputTransferToken
-                    ?: throw IllegalStateException("no inputTransferToken; view not attached")
-                val spec = OpenSpec(
-                    inputTransferToken = token,
-                    displayId = display.displayId,
-                    widthPx = width.coerceAtLeast(1),
-                    heightPx = height.coerceAtLeast(1),
-                    request = request,
-                    protocolVersion = Protocol.VERSION,
-                )
+                val spec = if (API35) {
+                    val token = surfaceView.rootSurfaceControl?.inputTransferToken
+                        ?: throw IllegalStateException("no inputTransferToken; view not attached")
+                    newSpec(hostToken = null, inputToken = token)
+                } else {
+                    val host = hostInputTokenPre35()
+                        ?: throw IllegalStateException("no pre-35 host input token (getHostToken unavailable)")
+                    newSpec(hostToken = host, inputToken = null)
+                }
                 remote.open(spec, hostChannelStub, openCallbackStub)
             } catch (t: Throwable) {
                 terminate(PipeTransportException("open() failed: ${t.message}", t))
             }
+        }
+
+        private fun newSpec(hostToken: IBinder?, inputToken: android.os.Parcelable?) = OpenSpec(
+            hostToken = hostToken,
+            inputToken = inputToken,
+            displayId = display.displayId,
+            widthPx = width.coerceAtLeast(1),
+            heightPx = height.coerceAtLeast(1),
+            request = request,
+            protocolVersion = Protocol.VERSION,
+        )
+
+        /**
+         * The host input token on API 30–34. `SurfaceView.getHostToken()` is `@hide` before API 35,
+         * so it is reached by reflection; if non-SDK restrictions block it, falls back to the
+         * window token. Returns null only if neither is available.
+         */
+        private fun hostInputTokenPre35(): IBinder? {
+            runCatching {
+                val m = SurfaceView::class.java.getDeclaredMethod("getHostToken").apply { isAccessible = true }
+                (m.invoke(surfaceView) as? IBinder)?.let { return it }
+            }.onFailure { Log.w(TAG, "getHostToken() unavailable; falling back to windowToken", it) }
+            return windowToken
         }
 
         /** Uid captured at gate time; -1 means unresolvable, so the check is skipped. */
@@ -344,7 +376,7 @@ class PipeView @JvmOverloads constructor(
                     remoteSession = session
                     guestChannel = guest
                     surfaceView.setChildSurfacePackage(surfacePackage)
-                    embeddedInputToken = runCatching { surfacePackage.inputTransferToken }.getOrNull()
+                    embeddedInputToken = if (API35) runCatching { surfacePackage.inputTransferToken }.getOrNull() else null
                     stateFlow.value = PipeState.Open(checkNotNull(verifiedPeer) { "onOpened without a verified peer" })
                     deferred.complete(this@OpenAttempt.session)
                 }

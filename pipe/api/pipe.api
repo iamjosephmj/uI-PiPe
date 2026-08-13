@@ -589,20 +589,22 @@ public class tech/ssemaj/pipe/transport/IOpenResultCallback$_Parcel {
 
 public final class tech/ssemaj/pipe/transport/OpenSpec : android/os/Parcelable {
 	public static final field CREATOR Landroid/os/Parcelable$Creator;
-	public fun <init> (Landroid/window/InputTransferToken;IIILtech/ssemaj/pipe/core/PipeRequest;I)V
-	public final fun component1 ()Landroid/window/InputTransferToken;
-	public final fun component2 ()I
+	public fun <init> (Landroid/os/IBinder;Landroid/os/Parcelable;IIILtech/ssemaj/pipe/core/PipeRequest;I)V
+	public final fun component1 ()Landroid/os/IBinder;
+	public final fun component2 ()Landroid/os/Parcelable;
 	public final fun component3 ()I
 	public final fun component4 ()I
-	public final fun component5 ()Ltech/ssemaj/pipe/core/PipeRequest;
-	public final fun component6 ()I
-	public final fun copy (Landroid/window/InputTransferToken;IIILtech/ssemaj/pipe/core/PipeRequest;I)Ltech/ssemaj/pipe/transport/OpenSpec;
-	public static synthetic fun copy$default (Ltech/ssemaj/pipe/transport/OpenSpec;Landroid/window/InputTransferToken;IIILtech/ssemaj/pipe/core/PipeRequest;IILjava/lang/Object;)Ltech/ssemaj/pipe/transport/OpenSpec;
+	public final fun component5 ()I
+	public final fun component6 ()Ltech/ssemaj/pipe/core/PipeRequest;
+	public final fun component7 ()I
+	public final fun copy (Landroid/os/IBinder;Landroid/os/Parcelable;IIILtech/ssemaj/pipe/core/PipeRequest;I)Ltech/ssemaj/pipe/transport/OpenSpec;
+	public static synthetic fun copy$default (Ltech/ssemaj/pipe/transport/OpenSpec;Landroid/os/IBinder;Landroid/os/Parcelable;IIILtech/ssemaj/pipe/core/PipeRequest;IILjava/lang/Object;)Ltech/ssemaj/pipe/transport/OpenSpec;
 	public final fun describeContents ()I
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getDisplayId ()I
 	public final fun getHeightPx ()I
-	public final fun getInputTransferToken ()Landroid/window/InputTransferToken;
+	public final fun getHostToken ()Landroid/os/IBinder;
+	public final fun getInputToken ()Landroid/os/Parcelable;
 	public final fun getProtocolVersion ()I
 	public final fun getRequest ()Ltech/ssemaj/pipe/core/PipeRequest;
 	public final fun getWidthPx ()I

@@ -8,7 +8,7 @@ plugins {
 android {
     namespace = "tech.ssemaj.pipe"
     compileSdk = 36
-    defaultConfig { minSdk = 35 }
+    defaultConfig { minSdk = 30 }
     buildFeatures { aidl = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

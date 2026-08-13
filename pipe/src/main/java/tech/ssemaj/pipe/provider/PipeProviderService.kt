@@ -4,6 +4,7 @@ import android.app.Service
 import android.content.Intent
 import android.hardware.display.DisplayManager
 import android.os.Binder
+import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -109,7 +110,14 @@ abstract class PipeProviderService : Service() {
             is PaneResult.Content -> {
                 val content = result.content
                 val display = getSystemService(DisplayManager::class.java).getDisplay(spec.displayId)
-                val scvh = SurfaceControlViewHost(this, display, spec.inputTransferToken)
+                // API 35+ links input via the public InputTransferToken; API 30–34 uses the older
+                // host-token (IBinder) constructor — same SurfaceControlViewHost, older input path.
+                val scvh = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                    SurfaceControlViewHost(this, display, spec.inputToken as android.window.InputTransferToken)
+                } else {
+                    @Suppress("DEPRECATION")
+                    SurfaceControlViewHost(this, display, spec.hostToken)
+                }
                 scvh.setView(content.view, spec.widthPx, spec.heightPx)
 
                 val hostBinder = hostChannel.asBinder()

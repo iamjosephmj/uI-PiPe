@@ -109,10 +109,11 @@ interface IGuestChannel { oneway void send(in PipeMessage m); }
 
 ```
 OpenSpec(
-    inputTransferToken: InputTransferToken,  // host's own input token — the key to cross-process input
+    hostToken: IBinder?,       // host input token for API 30–34 (SurfaceView.getHostToken)
+    inputToken: Parcelable?,   // API-35 InputTransferToken, carried as Parcelable so pre-35 can load OpenSpec
     displayId: Int,
     widthPx, heightPx: Int,
-    request: PipeRequest,                    // action + extras + presentation
+    request: PipeRequest,      // action + extras + presentation
     protocolVersion: Int,
 )
 ```
@@ -136,17 +137,17 @@ sequenceDiagram
     S->>P: ProviderGate.admit(callingUid, request, protocolVersion)
     Note over P: denied → callback.onDenied(reason), no surface built
     P->>P: onOpenPane(request, hostHandle) → PaneResult.Content(view)
-    P->>P: SurfaceControlViewHost(display, inputTransferToken).setView(view, w, h)
+    P->>P: SurfaceControlViewHost(display, host/inputToken).setView(view, w, h)
     P-->>H: onOpened(surfacePackage, IEmbedSession, IGuestChannel)
     H->>H: surfaceView.setChildSurfacePackage(surfacePackage)
-    H->>H: capture embedded inputTransferToken, state = Open
+    H->>H: state = Open
 ```
 
 Key points:
 
 - **Identity is read at the earliest correct moment.** `Binder.getCallingUid()` only reflects the caller *inside* the transaction, so the provider captures it on the binder thread before any coroutine hop.
 - **Gating happens on both ends, before anything expensive.** The host authorizes the provider before it binds; the provider authorizes the host before it builds a surface. A denial on either side produces no surface and (host side) no bind.
-- **The surface travels as a `SurfacePackage`.** The provider builds a `SurfaceControlViewHost` against the host's `inputTransferToken` and display, then ships the wrapped surface back; the host attaches it with `SurfaceView.setChildSurfacePackage`.
+- **The surface travels as a `SurfacePackage`.** The provider builds a `SurfaceControlViewHost` against the host's input token (an API-35 `InputTransferToken`, or a pre-35 `IBinder` host token — see §9) and display, then ships the wrapped surface back; the host attaches it with `SurfaceView.setChildSurfacePackage`.
 
 ---
 
@@ -268,14 +269,18 @@ The provider's `PaneResult.Content` is identical across modes; only the **host c
 
 Full-screen and dialog wrap the same `PipeView` and reuse the same `open()` / `PipeSession` core; they add only host-owned chrome and lifecycle. (`DIALOG` is an in-activity overlay rather than a real `android.app.Dialog`: a second window breaks embedded-`SurfaceControlViewHost` input focus and hides the pane from the accessibility tree. Keeping the pane at the same window-nesting depth as full-screen avoids both.)
 
-### Cross-process input — and its one sharp edge
+### Cross-process input
 
-A plain `SurfaceView` does **not** forward touches into an embedded `SurfaceControlViewHost`. Pipe hands each gesture across using the *public* input-transfer APIs added in API 35 — `android.window.InputTransferToken` and `WindowManager.transferTouchGesture()`. (Cross-process embedded touch itself is older — `SurfaceControlViewHost` has received input since API 30 via a host `IBinder` token — but that path was hidden/`@hide` and its IME/focus story was weak. Pipe builds on the 35 public path by choice; see §13.)
+A plain `SurfaceView` does **not** forward touches into an embedded `SurfaceControlViewHost`; the host must link its input token to the embedded window. Pipe does this two ways, selected by API level, and the choice is baked into `OpenSpec` (which token field is non-null):
 
-- **Embedded mode** transfers the *current* gesture on every `ACTION_DOWN` via `WindowManager.transferTouchGesture(hostToken, embeddedToken)`. This is required because the host's own content may sit above the pane.
-- **Full-screen / dialog mode** — where the pane is the entire interactive surface — instead render the pane surface on top (`setZOrderOnTop(true)`) and let the embedded window receive input **directly and persistently**, so repeated gestures work naturally.
+- **API 35+** — the host passes a public `android.window.InputTransferToken` (`OpenSpec.inputToken`); the provider builds `SurfaceControlViewHost(ctx, display, InputTransferToken)`. Touch is handed across per `ACTION_DOWN` with `WindowManager.transferTouchGesture()` in embedded mode, or — where the pane is the whole surface (full-screen/dialog) — by rendering the surface on top (`setZOrderOnTop(true)`) so it receives input directly.
+- **API 30–34** — there is no public input-token accessor and no `transferTouchGesture`, so the host obtains its input token via the `@hide` `SurfaceView.getHostToken()` (reached by reflection), passes it as an `IBinder` (`OpenSpec.hostToken`), and the provider builds the older `SurfaceControlViewHost(ctx, display, IBinder)` constructor (API 30). The pane surface is z-ordered on top, and with the host-token link the embedded window receives touch directly — no `transferTouchGesture` needed.
 
-**Known limitation:** in embedded mode, the per-gesture transfer reliably delivers only the *first* interactive gesture of a session. After the first transfer the host stops receiving subsequent `ACTION_DOWN`s and the embedded window does not independently receive them, so a second tap in the same embedded session is not delivered. Interactive embedded panes should therefore treat a session as single-interaction and re-open for the next (the sample host demonstrates a "reopen"/fresh-session model). Full-screen and dialog modes are not affected. Resolving this for embedded mode is the highest-value open problem in the codebase.
+`SurfaceControlViewHost` itself is API 30, which is the library's hard floor; below it there is no cross-process embedding at all (the host degrades to a clean `PipeTransportException`, not a crash).
+
+**Caveats of the pre-35 path:** `getHostToken()` is a non-SDK method — greylisted (works on stock 30–34), but potentially restricted on some OEM builds or a future OS; if it is blocked, Pipe falls back to the window token and input may not route. Cross-process **IME** is also weaker before 35. On API 35, prefer the public path.
+
+**Embedded-mode note (API 35):** the per-gesture `transferTouchGesture` on API 35 can fail to deliver a *second* gesture in some sequences (e.g. after an intervening host-side tap), so the sample treats an embedded API-35 session as effectively single-interaction and reopens for the next. Full-screen/dialog (direct z-order input) and the API-30–34 host-token path are not affected.
 
 ---
 
@@ -308,13 +313,13 @@ Errors surface as a small `PipeException` hierarchy (`PipeDeniedException`, `Pip
 
 - Open, unvetted provider ecosystems. The trust anchor is signing identity (same key or an allowlist); there is no runtime sandbox around arbitrary provider code beyond process isolation.
 - Protecting a provider from a host that legitimately embeds it (the host owns the window it draws into).
-- Lower-SDK devices — Pipe's input model is built on the API 35 `InputTransferToken` / `transferTouchGesture` public APIs, and there is no pre-35 fallback in this build (see §13 for what a lower floor would take).
+- Devices below API 30 — `SurfaceControlViewHost` does not exist, so there is no cross-process embedding to secure; open fails with a `PipeTransportException`.
 
 ---
 
 ## 13. Known limitations & non-goals
 
-- **`minSdk = 35` (Android 15) — an implementation choice, not a platform limit.** `SurfaceControlViewHost` embedding *and* interactive **touch** have existed since API 30 (Android 11). Pipe sets its floor at 35 because it builds on the *public* input-transfer APIs added there (`InputTransferToken` + `transferTouchGesture`), which also make cross-process **IME** clean and reliable — the genuinely weak spot before 35. Lowering the floor toward 30 is feasible (a pre-35 host-token input path, with weaker IME on 30–34) but is not currently implemented.
+- **`minSdk = 30` (Android 11) — the hard floor.** `SurfaceControlViewHost`, the embedding primitive, is API 30; nothing works below it. API 30–34 run the host-token input path (§9), which relies on the reflected `@hide` `SurfaceView.getHostToken()` — greylisted today but non-SDK, and with weaker IME. API 35+ use the public `InputTransferToken` / `transferTouchGesture` path and get hardware attestation on real devices. Verified working end-to-end on API 30 (emulator) and API 36 (Pixel).
 - **Embedded single-gesture-per-session** (§9) — the primary interactive limitation.
 - **IPC granularity** — every message is a binder transaction; Pipe suits coarse-grained handoffs, not high-frequency small-message loops.
 - **Per-process cost** — a second process carries a fixed memory/startup tax; "extra heap" is not free, and cold open has real latency (bind + handshake + surface attach).

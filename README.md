@@ -8,7 +8,7 @@ One Android app renders a **live, interactive UI inside another app's window** �
 
 A *host* places a pane in its layout; a *provider* renders a `View` into it, in its own process, over `SurfaceControlViewHost`, with a two-way typed channel between them. Host jank never stalls the pane, a provider crash can't take down the host, and neither app's code runs in the other.
 
-**Status:** first release (`1.0.0-alpha01`). Android 15+ (`minSdk 35`). Targets a closed app family / vetted partners, not an open marketplace. Deep dive: **[ARCHITECTURE.md](ARCHITECTURE.md)**.
+**Status:** first release (`1.0.0-alpha01`). Android 11+ (`minSdk 30`). Targets a closed app family / vetted partners, not an open marketplace. Deep dive: **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 ## See it in action
 
@@ -119,7 +119,7 @@ Independent per-direction streams. Delivery is **ordered** and **de-duplicated**
 
 ## Known limitations
 
-- **`minSdk 35`** — an implementation choice (built on the public API-35 `InputTransferToken` / `transferTouchGesture`). `SurfaceControlViewHost` + touch exist from API 30; a lower floor is feasible but not implemented.
-- **Embedded single-gesture-per-session** — an embedded pane reliably takes only the first gesture of a session; reopen for the next. Full-screen and dialog are unaffected.
+- **`minSdk 30`** — the hard floor: `SurfaceControlViewHost` (the embedding primitive) is API 30, so nothing works below it. Input takes two paths: **API 35+** uses the public `InputTransferToken` / `transferTouchGesture` (and clean IME); **API 30–34** passes the host input token (`SurfaceView.getHostToken()`, a **reflected `@hide` method**) to the provider's `SurfaceControlViewHost(Context, Display, IBinder)` constructor and z-orders the surface to route touch. That hidden call is greylisted (works on stock 30–34) but is non-SDK — it could be restricted on some OEM/future builds; IME is also weaker before 35.
+- **Embedded gestures on API 35** — in embedded mode on API 35 the per-gesture `transferTouchGesture` can drop repeated taps in some sequences; the sample reopens per interaction. Full-screen, dialog, and the API-30–34 path (which use direct/host-token input) are unaffected.
 - **Coarse-grained** — every message is a binder transaction; great for pane + occasional messages, not high-frequency loops.
 - **Alpha** — coherent and adversarially tested, not yet a hardened release.
