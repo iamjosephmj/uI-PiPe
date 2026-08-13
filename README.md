@@ -1,5 +1,11 @@
 # <img src="docs/media/logo.svg" width="46" align="top" alt="uI-PiPe logo"> uI-PiPe
 
+<p align="center">
+  <a href="https://jitpack.io/#iamjosephmj/uI-PiPe"><img src="https://jitpack.io/v/iamjosephmj/uI-PiPe.svg" alt="JitPack"></a>
+  <img src="https://img.shields.io/badge/minSdk-30-3CB043" alt="minSdk 30">
+  <img src="https://img.shields.io/badge/Kotlin-Android-5C94FC" alt="Kotlin Android">
+</p>
+
 **One app's live screen, rendered inside another app — across the process boundary, and verified.**
 
 App&nbsp;A (the *host*) hands its window to App&nbsp;B (the *provider*), and App&nbsp;B draws its own real, full-screen UI **right inside App&nbsp;A's window**, from a separate process. On screen it's seamless — nothing tells the user a second app is drawing it. Yet the two apps never share code or memory, and App&nbsp;A only ever lets an App&nbsp;B it has **cryptographically verified** take over its window.
@@ -27,8 +33,6 @@ Every open is a mutual, cryptographically-gated handshake — identity is kernel
 <p align="center"><img src="docs/media/handshake.svg" width="760" alt="Handshake: host verifies + authorizes, binds and calls open() with its window token; provider reads caller UID, authorizes, adds its full-screen window"></p>
 
 ## Install
-
-[![](https://jitpack.io/v/iamjosephmj/uI-PiPe.svg)](https://jitpack.io/#iamjosephmj/uI-PiPe)
 
 Available via [JitPack](https://jitpack.io/#iamjosephmj/uI-PiPe). Add the repository:
 
