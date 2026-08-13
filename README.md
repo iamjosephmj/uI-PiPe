@@ -1,4 +1,4 @@
-# Pipe
+# uI-PiPe
 
 One Android app renders a **live, interactive full-screen UI over another app's window** — across a process boundary, with a signing-identity check on both ends.
 
