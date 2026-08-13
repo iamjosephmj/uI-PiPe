@@ -1,6 +1,6 @@
 # uI-PiPe
 
-<p align="center"><img src="docs/media/logo.svg" width="112" alt="uI-PiPe app logo — an elbow pipe with bolted flanges"></p>
+<p align="center"><img src="docs/media/banner.svg" width="840" alt="uI-PiPe — a manifold of interconnected pipes"></p>
 
 One Android app renders a **live, interactive full-screen UI over another app's window** — across a process boundary, with a signing-identity check on both ends.
 
