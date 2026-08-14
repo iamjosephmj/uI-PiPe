@@ -23,6 +23,7 @@ class PaneService : PipeProviderService() {
     override suspend fun onOpenPane(request: PipeRequest, host: HostHandle): PaneResult {
         val hostPid = request.extras.getInt("hostPid", -1)
         val hostProc = request.extras.getString("hostProc") ?: "?"
+        val hostTid = request.extras.getInt("hostTid", -1)
 
         fun line(text: String, sizeSp: Float, color: Int) = TextView(this).apply {
             this.text = text; textSize = sizeSp; setTextColor(color)
@@ -36,6 +37,7 @@ class PaneService : PipeProviderService() {
             addView(line("Pane rendered from a separate process", 20f, Color.WHITE))
             addView(line("\nHost   ·  $hostProc\n            pid $hostPid", 15f, Color.parseColor("#58A6FF")))
             addView(line("\nPane   ·  ${Application.getProcessName()}\n            pid ${Process.myPid()}", 15f, Color.parseColor("#A371F7")))
+            addView(line("\nUI threads · host “main” tid $hostTid  →  pane “${Thread.currentThread().name}” tid ${Process.myTid()}", 13f, Color.parseColor("#DBE9FF")))
             addView(line("\nSame app · same UID (${Process.myUid()}) · two processes · one window", 13f, Color.parseColor("#8B98A5")))
             addView(Button(this@PaneService).apply { text = "Close"; setOnClickListener { host.close() } })
         }

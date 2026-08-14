@@ -2,12 +2,11 @@ package tech.ssemaj.pipe.provider
 
 import android.graphics.PixelFormat
 import android.os.IBinder
-import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 
 /**
- * Adds [root] as the pane's full-screen window, parented to the host's window token, per [spec].
+ * Adds [root] as the pane's window, parented to the host's window token, per [spec].
  *
  * This is where Pipe's whole mechanism lives: a `TYPE_APPLICATION_PANEL` window whose
  * [WindowManager.LayoutParams.token] is the host activity's window token ([hostToken]) becomes a
@@ -15,21 +14,24 @@ import android.view.WindowManager
  * therefore a first-class focus/IME/input target on every API from 30 up, with no
  * `SurfaceControlViewHost` and no `@hide` APIs.
  *
- * The window is always full-screen; [spec] only decides opacity ([PaneSpec.translucent], default
- * transparent) and focusability. Any dialog/sheet shape is the provider's own drawing inside this
- * canvas. `SOFT_INPUT_ADJUST_RESIZE` keeps pane editors visible above the soft keyboard.
+ * By default the window is full-screen, focusable, translucent, and touch-modal; [spec] can shrink
+ * it to a region and make it non-touch-modal (for tiling / multi-pane). `SOFT_INPUT_ADJUST_RESIZE`
+ * keeps pane editors visible above the soft keyboard.
  */
 internal fun WindowManager.addPane(root: View, hostToken: IBinder, spec: PaneSpec) {
-    val flags = if (spec.focusable) 0 else WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+    var flags = 0
+    if (!spec.focusable) flags = flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+    if (!spec.touchModal) flags = flags or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+
     val params = WindowManager.LayoutParams(
-        WindowManager.LayoutParams.MATCH_PARENT,
-        WindowManager.LayoutParams.MATCH_PARENT,
+        spec.widthPx,
+        spec.heightPx,
         WindowManager.LayoutParams.TYPE_APPLICATION_PANEL,
         flags,
         if (spec.translucent) PixelFormat.TRANSLUCENT else PixelFormat.OPAQUE,
     ).apply {
         token = hostToken
-        gravity = Gravity.TOP or Gravity.START
+        gravity = spec.gravity
         softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
     }
     addView(root, params)

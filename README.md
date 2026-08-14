@@ -126,11 +126,9 @@ Nothing else changes: same UID, so the window-token handoff and binder channel j
 
 The [`:sample-solo`](sample-solo) module demonstrates it — one Activity opening a pane against its own `:pane`-process service. Verified on a Pixel 6 Pro: host pid ≠ pane pid, same UID, one window.
 
-And it isn't limited to two. A host can open **several panes, each from its own process** — they're separate child windows of the host's window, so with transparent panes they composite together. `:sample-solo`'s *"Open 3 panes"* spins up host + `:paneA` + `:paneB` + `:paneC` — **four processes, three provider windows in one host window** (the host shows through the gaps):
+And it isn't limited to two. A host can open **several panes, each from its own process** — each is a separate child window of the host's window token. Size each pane to a region and mark it non-touch-modal — `PaneSpec(touchModal = false, gravity = …, heightPx = …)` — and they **tile**: every pane is *independently interactive* (touches outside a pane's bounds fall through to the ones behind), each running on its **own UI thread**. `:sample-solo`'s *"Open 3 panes"* spins up host + `:paneA` + `:paneB` + `:paneC` — **four processes, three interactive bands in one host window**. Below, each band was tapped separately (A×1, B×2, C×1) and each shows a distinct kernel thread id — proof of separate processes *and* separate UI threads:
 
-<p align="center"><img src="docs/media/sample-solo-multi.png" width="300" alt="Four processes on a Pixel 6 Pro: three provider panes (blue :paneA, purple :paneB, green :paneC) each from its own process composited into the single host window, with the host visible between them"></p>
-
-Caveat: full-screen panes are touch-modal, so only the top-most one is the input target — independent *interactive* multi-pane would need non-overlapping touch regions. As a process/window-sharing model, though, there's no cap on how many processes render into one window.
+<p align="center"><img src="docs/media/sample-solo-multi.png" width="320" alt="Four processes on a Pixel 6 Pro: three interactive provider bands (blue :paneA tid 12988, purple :paneB tid 12990, green :paneC tid 12989), each independently tapped, composited into one host window with the host showing through the gaps"></p>
 
 ## Trust & authorization
 

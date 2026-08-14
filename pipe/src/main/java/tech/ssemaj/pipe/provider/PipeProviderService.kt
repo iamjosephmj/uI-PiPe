@@ -111,9 +111,10 @@ abstract class PipeProviderService : Service() {
     ) {
         val content = result.content
         val hostBinder = hostChannel.asBinder()
-        val match = FrameLayout.LayoutParams.MATCH_PARENT
+        // Fill a full-screen (MATCH) window; wrap a sized (region) window to its content.
+        fun fit(v: Int) = if (v == WindowManager.LayoutParams.MATCH_PARENT) v else FrameLayout.LayoutParams.WRAP_CONTENT
         val root = PaneRoot(this).apply {
-            addView(content.view, FrameLayout.LayoutParams(match, match))
+            addView(content.view, FrameLayout.LayoutParams(fit(result.spec.widthPx), fit(result.spec.heightPx)))
         }
         val windowManager = getSystemService(WindowManager::class.java)
         windowManager.addPane(root, spec.hostToken, result.spec)

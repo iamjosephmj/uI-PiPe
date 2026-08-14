@@ -25,12 +25,14 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         val info = findViewById<TextView>(R.id.host_info)
-        info.text = "Host process: ${Application.getProcessName()}\nhost pid ${Process.myPid()}"
+        info.text = "Host process: ${Application.getProcessName()}\n" +
+            "host pid ${Process.myPid()} · UI thread “${Thread.currentThread().name}” tid ${Process.myTid()}"
 
         findViewById<Button>(R.id.open).setOnClickListener {
             val extras = Bundle().apply {
                 putInt("hostPid", Process.myPid())
                 putString("hostProc", Application.getProcessName())
+                putInt("hostTid", Process.myTid())
             }
             PipeFullScreen.open(
                 activity = this,
