@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.parcelize) apply false
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.binary.compatibility.validator)
+    alias(libs.plugins.hydra) apply false
 }
 
 apiValidation {
