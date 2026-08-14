@@ -7,6 +7,7 @@ import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import tech.ssemaj.pipe.core.PipeRequest
+import tech.ssemaj.pipe.host.PipeBindImportance
 import tech.ssemaj.pipe.host.PipeFullScreen
 import tech.ssemaj.pipe.host.ProviderComponent
 
@@ -50,6 +51,9 @@ class MainActivity : AppCompatActivity() {
                     activity = this,
                     provider = ProviderComponent(packageName, "tech.ssemaj.pipe.samplesolo.$svc"),
                     request = PipeRequest("multi"),
+                    // Same app, fully trusted panes: let each pane process inherit the host's top
+                    // priority so all four processes sit at oom_score_adj 0 while the panes are up.
+                    bindImportance = PipeBindImportance.IMPORTANT,
                     onError = { e -> info.append("\n$svc: ${e::class.simpleName}") },
                 )
             }

@@ -47,10 +47,11 @@ internal class PipeConnection(
         request: PipeRequest,
         authorizer: PipeAuthorizer,
         timeout: Duration,
+        bindImportance: PipeBindImportance = PipeBindImportance.NORMAL,
     ): PipeSession = withContext(dispatcher) {
         check(current == null) { "PipeConnection already has a live session; call close() first" }
         val deferred = CompletableDeferred<PipeSession>()
-        val attempt = OpenAttempt(context, provider, request, hostToken, mainHandler, deferred, ::clearCurrent)
+        val attempt = OpenAttempt(context, provider, request, bindImportance, hostToken, mainHandler, deferred, ::clearCurrent)
         current = attempt
         try {
             withTimeout(timeout) {

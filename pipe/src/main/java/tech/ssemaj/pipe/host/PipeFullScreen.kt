@@ -24,6 +24,9 @@ import tech.ssemaj.pipe.core.PipeState
  * [onError]). The pane is torn down when the session closes from any side, on `ON_DESTROY`, or on
  * back-press — whichever comes first. Back inside the pane is handled by the provider's own window;
  * the host back-press callback here is the fallback for when focus is still on the host.
+ *
+ * [bindImportance] controls how much of the host's process priority the provider's process inherits
+ * while the pane is open; it defaults to [PipeBindImportance.NORMAL] (the pane ranks below the host).
  */
 object PipeFullScreen {
     fun open(
@@ -31,6 +34,7 @@ object PipeFullScreen {
         provider: ProviderComponent,
         request: PipeRequest,
         authorizer: PipeAuthorizer = PipeAuthorizers.sameSigningKey(activity),
+        bindImportance: PipeBindImportance = PipeBindImportance.NORMAL,
         onSession: (PipeSession) -> Unit = {},
         onError: (PipeException) -> Unit = {},
     ): Job {
@@ -54,7 +58,7 @@ object PipeFullScreen {
 
         return activity.lifecycleScope.launch {
             try {
-                val session = connection.open(provider, request, authorizer, 10.seconds)
+                val session = connection.open(provider, request, authorizer, 10.seconds, bindImportance)
                 // The session can end other ways than back-press (host close, provider close, peer
                 // death) — drop the observer/back callback then too, so they never leak.
                 activity.lifecycleScope.launch {

@@ -52,6 +52,7 @@ internal class OpenAttempt(
     private val context: Context,
     private val provider: ProviderComponent,
     private val request: tech.ssemaj.pipe.core.PipeRequest,
+    private val bindImportance: PipeBindImportance,
     private val hostToken: () -> IBinder?,
     private val mainHandler: Handler,
     private val deferred: CompletableDeferred<PipeSession>,
@@ -100,7 +101,7 @@ internal class OpenAttempt(
 
     fun bind() {
         val intent = Intent("tech.ssemaj.pipe.action.OPEN_PANE").setComponent(provider.toComponentName())
-        bound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        bound = context.bindService(intent, connection, bindImportance.toBindFlags())
         if (!bound) {
             runCatching { context.unbindService(connection) }
             terminate(PipeTransportException("bindService returned false"))
