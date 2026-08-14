@@ -122,7 +122,7 @@ PipeFullScreen.open(this, ProviderComponent(packageName, "$packageName.PaneServi
 
 Nothing else changes: same UID, so the window-token handoff and binder channel just work, and the `sameSigningKey` gate passes trivially (same signing key). You get **in-app process isolation** — a heavy or risky UI component (a WebView, an ad/partner SDK, an ML/native view, a plugin) runs in a second process with its own heap, main thread, and crash domain, rendered seamlessly in your Activity.
 
-<p align="center"><img src="docs/media/sample-solo.png" width="520" alt="The :sample-solo pane on a Pixel 6 Pro: Host pid 7154 and Pane pid 7274, same app, same UID, two processes, one window"></p>
+<p align="center"><img src="docs/media/sample-solo.gif" width="300" alt="The :sample-solo demo on a Pixel 6 Pro: tapping Open renders a pane from the app's own :pane process (host pid ≠ pane pid, same UID, one window), then closes"></p>
 
 The [`:sample-solo`](sample-solo) module demonstrates it — one Activity opening a pane against its own `:pane`-process service. Verified on a Pixel 6 Pro: host pid ≠ pane pid, same UID, one window.
 
