@@ -15,5 +15,10 @@
             android:name=".PaneService"
             android:process=":pane"
             android:exported="false" />
+
+        <!-- Experiment: three more providers, each in its OWN process. Host + these three = 4 processes. -->
+        <service android:name=".PaneServiceA" android:process=":paneA" android:exported="false" />
+        <service android:name=".PaneServiceB" android:process=":paneB" android:exported="false" />
+        <service android:name=".PaneServiceC" android:process=":paneC" android:exported="false" />
     </application>
 </manifest>

@@ -109,7 +109,7 @@ PaneResult.Content(content, PaneSpec(translucent = false)) // opaque full-screen
 
 Because the pane's root is a lifecycle/saved-state/viewmodel owner, you can drop a `ComposeView` straight in and animate the entrance with Compose — the sample provider renders its consent flow as a Compose dialog. BACK dismisses the pane, and `host.close()` lets the provider dismiss it too. Override `authorizer()` to change who may open it. Manifest: an exported `<service>` with the `tech.ssemaj.pipe.action.OPEN_PANE` action.
 
-## Same app, two processes
+## Same app, N processes
 
 Host and provider don't have to be two apps — they can be **one app across two processes**. Put the provider service in its own process and point the host at its own component:
 
@@ -125,6 +125,12 @@ Nothing else changes: same UID, so the window-token handoff and binder channel j
 <p align="center"><img src="docs/media/sample-solo.gif" width="300" alt="The :sample-solo demo on a Pixel 6 Pro: tapping Open renders a pane from the app's own :pane process (host pid ≠ pane pid, same UID, one window), then closes"></p>
 
 The [`:sample-solo`](sample-solo) module demonstrates it — one Activity opening a pane against its own `:pane`-process service. Verified on a Pixel 6 Pro: host pid ≠ pane pid, same UID, one window.
+
+And it isn't limited to two. A host can open **several panes, each from its own process** — they're separate child windows of the host's window, so with transparent panes they composite together. `:sample-solo`'s *"Open 3 panes"* spins up host + `:paneA` + `:paneB` + `:paneC` — **four processes, three provider windows in one host window** (the host shows through the gaps):
+
+<p align="center"><img src="docs/media/sample-solo-multi.png" width="300" alt="Four processes on a Pixel 6 Pro: three provider panes (blue :paneA, purple :paneB, green :paneC) each from its own process composited into the single host window, with the host visible between them"></p>
+
+Caveat: full-screen panes are touch-modal, so only the top-most one is the input target — independent *interactive* multi-pane would need non-overlapping touch regions. As a process/window-sharing model, though, there's no cap on how many processes render into one window.
 
 ## Trust & authorization
 

@@ -39,5 +39,18 @@ class MainActivity : AppCompatActivity() {
                 onError = { e -> info.append("\nerror: ${e::class.simpleName}") },
             )
         }
+
+        // Experiment: open three panes at once, each from its own process → host + 3 = 4 processes,
+        // three provider windows composed in one host window.
+        findViewById<Button>(R.id.open_multi).setOnClickListener {
+            listOf("PaneServiceA", "PaneServiceB", "PaneServiceC").forEach { svc ->
+                PipeFullScreen.open(
+                    activity = this,
+                    provider = ProviderComponent(packageName, "tech.ssemaj.pipe.samplesolo.$svc"),
+                    request = PipeRequest("multi"),
+                    onError = { e -> info.append("\n$svc: ${e::class.simpleName}") },
+                )
+            }
+        }
     }
 }
