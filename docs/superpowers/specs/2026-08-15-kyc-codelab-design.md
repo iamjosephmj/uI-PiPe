@@ -179,10 +179,15 @@ Each step: goal, exact code/commands (no placeholders), and a "verify it" checkp
 | GitHub Pages `/docs` conflicts with README media links | Codelab isolated under `docs/codelab/`; README links to `docs/media/` are untouched |
 | hydra `guarded` flavor unbuildable in CI (Maven Central plugin resolution) | Assemble `guarded` locally/on device; keep CI to `dev` + host |
 
-## 13. Open items for the implementation plan
+## 13. Resolved planning decisions
 
-- Shared contract types: dedicated `:sample-kyc-contract` module vs duplicated `@Serializable`
-  classes in each app. (Lean: small shared module.)
-- Exact CI matrix for the `guarded` flavor (assemble-only vs excluded).
-- Whether the verifier also pins the host (bidirectional) or only host→verifier (primary lesson).
-- Claat source location and the publish command wording for CONTRIBUTING.
+- **Shared contract types:** a dedicated `:sample-kyc-contract` module holding the
+  `@Serializable` `KycRequest`/`KycResult`/enums, depended on by both apps (DRY; demonstrates
+  sharing a wire contract).
+- **`guarded` flavor in CI:** CI assembles `:sample-kyc-host` + `:sample-kyc-verifier`'s **`dev`**
+  flavor only; the `guarded` flavor is device-only and built manually (Maven Central hydra
+  plugin, RASP self-terminates in CI's headless env).
+- **Pinning direction:** **host→verifier only** is implemented; the codelab adds a one-paragraph
+  callout noting the reverse (verifier pinning the host) is symmetric.
+- **Claat source:** markdown source at `docs/codelab/kyc.md`; generated output under
+  `docs/codelab/`; the single `claat export` publish command is documented in CONTRIBUTING.
