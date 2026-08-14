@@ -26,7 +26,7 @@ class MainActivity : AppCompatActivity() {
         const val VERIFIER_PKG = "tech.ssemaj.pipe.kycverifier"
         const val VERIFIER_SVC = "tech.ssemaj.pipe.kycverifier.KycVerifierService"
         // Filled in Task 4 with VerifyID's real signing-cert SHA-256 (lowercase hex, no colons).
-        const val VERIFIER_CERT_SHA256 = "REPLACE_IN_TASK_4"
+        const val VERIFIER_CERT_SHA256 = "21027f81c7dacf5c09246d1eb6e61a4ea797ef5a8e198e74721be8739cd3e706"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
