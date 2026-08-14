@@ -9,6 +9,7 @@ rootProject.name = "pipe"
 include(":pipe")
 include(":pipe-serialization")
 include(":sample-contract")
+include(":sample-kyc-contract")
 include(":sample-provider")
 include(":sample-host")
 include(":sample-solo")
