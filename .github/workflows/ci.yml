@@ -22,7 +22,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Binary-compatibility check + unit tests
+      - name: Binary-compatibility check + unit tests + build
         run: >
           ./gradlew --no-daemon --stacktrace
           :pipe:apiCheck
@@ -30,6 +30,7 @@ jobs:
           :pipe-serialization:testDebugUnitTest
           :sample-host:testDebugUnitTest
           :sample-provider:testDebugUnitTest
+          :sample-solo:assembleDebug
 
       - name: Upload test reports
         if: always()
