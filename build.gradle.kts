@@ -8,5 +8,5 @@ plugins {
 }
 
 apiValidation {
-    ignoredProjects.addAll(listOf("sample-host", "sample-provider", "evil-host", "evil-provider", "sample-contract", "sample-kyc-contract"))
+    ignoredProjects.addAll(listOf("sample-host", "sample-provider", "evil-host", "evil-provider", "sample-contract", "sample-kyc-contract", "sample-kyc-verifier"))
 }
