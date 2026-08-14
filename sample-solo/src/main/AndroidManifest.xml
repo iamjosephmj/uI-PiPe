@@ -1,0 +1,19 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:label="uI-PiPe Solo (2 processes)"
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- The provider runs in a SEPARATE process of THIS SAME app. It doesn't need to be
+             exported: the host binds it by explicit component within the app. -->
+        <service
+            android:name=".PaneService"
+            android:process=":pane"
+            android:exported="false" />
+    </application>
+</manifest>

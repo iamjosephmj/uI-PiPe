@@ -109,6 +109,19 @@ PaneResult.Content(content, PaneSpec(translucent = false)) // opaque full-screen
 
 Because the pane's root is a lifecycle/saved-state/viewmodel owner, you can drop a `ComposeView` straight in and animate the entrance with Compose — the sample provider renders its consent flow as a Compose dialog. BACK dismisses the pane, and `host.close()` lets the provider dismiss it too. Override `authorizer()` to change who may open it. Manifest: an exported `<service>` with the `tech.ssemaj.pipe.action.OPEN_PANE` action.
 
+## Same app, two processes
+
+Host and provider don't have to be two apps — they can be **one app across two processes**. Put the provider service in its own process and point the host at its own component:
+
+```xml
+<service android:name=".PaneService" android:process=":pane" android:exported="false" />
+```
+```kotlin
+PipeFullScreen.open(this, ProviderComponent(packageName, "$packageName.PaneService"), PipeRequest("demo"))
+```
+
+Nothing else changes: same UID, so the window-token handoff and binder channel just work, and the `sameSigningKey` gate passes trivially (same signing key). You get **in-app process isolation** — a heavy or risky UI component (a WebView, an ad/partner SDK, an ML/native view, a plugin) runs in a second process with its own heap, main thread, and crash domain, rendered seamlessly in your Activity. The [`:sample-solo`](sample-solo) module demonstrates it; verified on a Pixel 6 Pro — host pid ≠ pane pid, same UID, one window.
+
 ## Trust & authorization
 
 A `PipeAuthorizer` only ever sees the verified `PeerIdentity` the library built — never a self-reported name.

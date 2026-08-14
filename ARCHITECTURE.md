@@ -51,6 +51,7 @@ Pipe does exactly one thing: a provider draws a **single full-screen pane** over
 :sample-contract       Example @Serializable message contract shared by the two sample apps.
 :sample-host           Demo host: a Compose screen that opens the provider's full-screen certification pane.
 :sample-provider       Demo provider: a consent pane that signs a host nonce with an AndroidKeyStore key.
+:sample-solo           One app, two processes — an Activity opens a pane against its own `:pane`-process service.
 :evil-host             Adversarial host, signed with a different key — proves the provider gate rejects it.
 :evil-provider         Adversarial provider — proves the host gate rejects it, with no window or bind.
 ```
@@ -171,6 +172,10 @@ flowchart LR
 - The provider's pane construction, message handling, and provider-initiated sends run on the provider's **main thread** via a service-owned `paneScope` (`Dispatchers.Main.immediate` + `SupervisorJob`). The provider is responsible for pushing its own heavy work onto background threads — Pipe gives it a *separate* main thread, not extra ones.
 - Cross-process identity resolution (PackageManager cert lookups) runs on `Dispatchers.IO` host-side so it never blocks the caller's main thread.
 - Everything on the wire is `oneway`, so neither side ever blocks a binder thread waiting on the other.
+
+### Host and provider in one app
+
+Nothing in the model requires host and provider to be *different apps*. Give the provider `Service` its own process (`android:process=":pane"` in the manifest) and point the host at its own component (`ProviderComponent(packageName, "$packageName.PaneService")`), and you get the same thing **within a single app**: the pane runs in a second process — its own heap, main-thread Looper, and crash domain — rendered in the host's window. Because both processes share the app's UID, the window-token handoff and binder channel work if anything more freely than cross-app (no cross-UID window checks), and the `sameSigningKey` gate is trivially satisfied. This is *in-app process isolation for UI* — the pattern for running a heavy or risky component (WebView, SDK, ML/native view, plugin) off your main process. The provider service can be `exported="false"`, since it's bound by explicit component from inside the app. See `:sample-solo` (verified on device: host pid ≠ pane pid, same UID, one window).
 
 ---
 
