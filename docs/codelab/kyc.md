@@ -285,7 +285,7 @@ step). A production provider would likely pin the host's cert here too, symmetri
 
 ### Hardening it with RASP
 
-VerifyID's `guarded` build variant applies the [hydra](https://github.com/ssemaj/hydra) RASP
+VerifyID's `guarded` build variant applies the [hydra](https://github.com/iamjosephmj/hydra) RASP
 Gradle plugin, opt-in via a `-Prasp` property so a plain build stays emulator-runnable:
 
 ```kotlin
@@ -314,12 +314,12 @@ dependencyResolutionManagement {
 }
 ```
 
-Full source: [`:sample-kyc-verifier`](https://github.com/iamjosephmj/uI-PiPe/tree/main/sample-kyc-verifier).
+Full source: [`:sample-kyc-verifier`](https://github.com/iamjosephmj/uI-PiPe/tree/master/sample-kyc-verifier).
 
 **Where to go next:**
 
 - uI-PiPe main README — [Trust & authorization](https://github.com/iamjosephmj/uI-PiPe#trust--authorization),
   [Channel semantics](https://github.com/iamjosephmj/uI-PiPe#channel-semantics).
-- [ARCHITECTURE.md](https://github.com/iamjosephmj/uI-PiPe/blob/main/ARCHITECTURE.md) — the full
+- [ARCHITECTURE.md](https://github.com/iamjosephmj/uI-PiPe/blob/master/ARCHITECTURE.md) — the full
   handshake, UID-gated callbacks, and `BIND_PANE` model.
 - File issues or feedback: https://github.com/iamjosephmj/uI-PiPe/issues
