@@ -57,6 +57,15 @@ git add pipe/api/pipe.api
 
 CI runs `:pipe:apiCheck` and will fail if `pipe/api/pipe.api` doesn't match the code.
 
+### Regenerating the KYC codelab
+
+The codelab source is `docs/codelab/kyc.md`. Regenerate the static site with
+[claat](https://github.com/googlecodelabs/tools):
+
+    claat export -o docs/codelab docs/codelab/kyc.md
+
+Commit the regenerated `docs/codelab/<id>/` output alongside the source.
+
 ## Project layout
 
 ```
@@ -65,6 +74,9 @@ CI runs `:pipe:apiCheck` and will fail if `pipe/api/pipe.api` doesn't match the 
 :sample-contract      Shared @Serializable message contract for the samples.
 :sample-host / :sample-provider   The demo: a verified hardware-attestation consent flow.
 :evil-host / :evil-provider       Differently-signed adversarial apps that assert denial in both directions.
+:sample-kyc-contract  Shared @Serializable KYC wire types for the codelab.
+:sample-kyc-host      "Meridian Bank" — codelab host app.
+:sample-kyc-verifier  "VerifyID" — codelab KYC provider (RASP-guarded via -Prasp).
 ```
 
 Deep dive: **[ARCHITECTURE.md](ARCHITECTURE.md)**.

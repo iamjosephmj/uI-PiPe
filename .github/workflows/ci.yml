@@ -31,6 +31,9 @@ jobs:
           :sample-host:testDebugUnitTest
           :sample-provider:testDebugUnitTest
           :sample-solo:assembleDebug
+          :sample-kyc-contract:test
+          :sample-kyc-host:assembleDebug
+          :sample-kyc-verifier:assembleDebug
 
       - name: Upload test reports
         if: always()
