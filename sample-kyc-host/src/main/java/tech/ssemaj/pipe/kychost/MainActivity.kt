@@ -26,7 +26,7 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         const val VERIFIER_PKG = "tech.ssemaj.pipe.kycverifier"
         const val VERIFIER_SVC = "tech.ssemaj.pipe.kycverifier.KycVerifierService"
-        // Filled in Task 4 with VerifyID's real signing-cert SHA-256 (lowercase hex, no colons).
+        // VerifyID's signing-cert SHA-256 (lowercase hex, no colons) — the pinned provider identity.
         const val VERIFIER_CERT_SHA256 = "21027f81c7dacf5c09246d1eb6e61a4ea797ef5a8e198e74721be8739cd3e706"
     }
 
@@ -41,7 +41,6 @@ class MainActivity : AppCompatActivity() {
             val extras = Bundle().apply {
                 putString("reference", reference)
                 putString("bankName", "Meridian Bank")
-                putString("level", KycLevel.ENHANCED.name)
             }
             PipeFullScreen.open(
                 activity = this,

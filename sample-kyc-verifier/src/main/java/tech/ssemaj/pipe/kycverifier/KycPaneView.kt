@@ -12,6 +12,8 @@ import tech.ssemaj.pipe.core.CloseReason
 import tech.ssemaj.pipe.core.PipeMessage
 import tech.ssemaj.pipe.provider.PipeContent
 import tech.ssemaj.pipe.samples.kyc.KycStatus
+import tech.ssemaj.pipe.serialization.PipeCodec
+import tech.ssemaj.pipe.samples.kyc.KycRequest
 
 /**
  * The verifier's UI, rendered inside the host's window as a uI-PiPe pane. A small mock wizard —
@@ -25,13 +27,21 @@ class KycPaneView(
 ) : PipeContent {
 
     private val flipper = ViewFlipper(ctx)
+    private lateinit var levelLabel: TextView
 
     override val view: View get() = flipper
 
     init {
         flipper.setBackgroundColor(Color.parseColor("#0D141D"))
         flipper.addView(screen(ctx, "Verify your identity",
-            "VerifyID needs to confirm your identity for $bankName.", "Continue") { flipper.showNext() })
+            "VerifyID needs to confirm your identity for $bankName.", "Continue") { flipper.showNext() }.also { consentScreen ->
+            levelLabel = TextView(ctx).apply {
+                textSize = 13f
+                gravity = Gravity.CENTER
+                setTextColor(Color.parseColor("#8B98A5"))
+            }
+            (consentScreen as LinearLayout).addView(levelLabel)
+        })
         flipper.addView(screen(ctx, "Scan your ID",
             "[ mock document frame ]\nNo real camera — this is a demo.", "Capture") { flipper.showNext() })
         flipper.addView(screen(ctx, "Liveness selfie",
@@ -56,6 +66,10 @@ class KycPaneView(
             })
         }
 
-    override fun onMessage(message: PipeMessage) { /* request handled in the service before mount */ }
+    override fun onMessage(message: PipeMessage) {
+        PipeCodec.decodeOrNull<KycRequest>(message)?.let { req ->
+            levelLabel.text = "Requested level: ${req.level}"
+        }
+    }
     override fun onClosed(reason: CloseReason) { onClose() }
 }

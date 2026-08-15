@@ -331,6 +331,8 @@ import tech.ssemaj.pipe.core.CloseReason
 import tech.ssemaj.pipe.core.PipeMessage
 import tech.ssemaj.pipe.provider.PipeContent
 import tech.ssemaj.pipe.samples.kyc.KycStatus
+import tech.ssemaj.pipe.serialization.PipeCodec
+import tech.ssemaj.pipe.samples.kyc.KycRequest
 
 /**
  * The verifier's UI, rendered inside the host's window as a uI-PiPe pane. A small mock wizard —
@@ -344,13 +346,21 @@ class KycPaneView(
 ) : PipeContent {
 
     private val flipper = ViewFlipper(ctx)
+    private lateinit var levelLabel: TextView
 
     override val view: View get() = flipper
 
     init {
         flipper.setBackgroundColor(Color.parseColor("#0D141D"))
         flipper.addView(screen(ctx, "Verify your identity",
-            "VerifyID needs to confirm your identity for $bankName.", "Continue") { flipper.showNext() })
+            "VerifyID needs to confirm your identity for $bankName.", "Continue") { flipper.showNext() }.also { consentScreen ->
+            levelLabel = TextView(ctx).apply {
+                textSize = 13f
+                gravity = Gravity.CENTER
+                setTextColor(Color.parseColor("#8B98A5"))
+            }
+            (consentScreen as LinearLayout).addView(levelLabel)
+        })
         flipper.addView(screen(ctx, "Scan your ID",
             "[ mock document frame ]\nNo real camera — this is a demo.", "Capture") { flipper.showNext() })
         flipper.addView(screen(ctx, "Liveness selfie",
@@ -375,14 +385,19 @@ class KycPaneView(
             })
         }
 
-    override fun onMessage(message: PipeMessage) { /* request handled in the service before mount */ }
+    override fun onMessage(message: PipeMessage) {
+        PipeCodec.decodeOrNull<KycRequest>(message)?.let { req ->
+            levelLabel.text = "Requested level: ${req.level}"
+        }
+    }
     override fun onClosed(reason: CloseReason) { onClose() }
 }
 ```
 
 `PipeContent` is uI-PiPe's contract for "the view you want rendered inside the host's window."
-`onMessage` receives further messages from the host after the pane is open; `onClosed` fires when
-the pane tears down for any reason.
+`onMessage` receives further messages from the host after the pane is open — here it decodes the
+typed `KycRequest` the bank sends right after the session opens and reflects the requested level
+on the consent screen; `onClosed` fires when the pane tears down for any reason.
 
 ### The provider service
 
@@ -578,7 +593,7 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         const val VERIFIER_PKG = "tech.ssemaj.pipe.kycverifier"
         const val VERIFIER_SVC = "tech.ssemaj.pipe.kycverifier.KycVerifierService"
-        // Filled in Task 4 with VerifyID's real signing-cert SHA-256 (lowercase hex, no colons).
+        // VerifyID's signing-cert SHA-256 (lowercase hex, no colons) — the pinned provider identity.
         const val VERIFIER_CERT_SHA256 = "21027f81c7dacf5c09246d1eb6e61a4ea797ef5a8e198e74721be8739cd3e706"
     }
 
@@ -593,7 +608,6 @@ class MainActivity : AppCompatActivity() {
             val extras = Bundle().apply {
                 putString("reference", reference)
                 putString("bankName", "Meridian Bank")
-                putString("level", KycLevel.ENHANCED.name)
             }
             PipeFullScreen.open(
                 activity = this,
@@ -642,6 +656,12 @@ Three uI-PiPe concepts appear here for the first time:
   the next step.
 - **Graceful failure handling** — the two `lifecycleScope.launch` blocks inside `onSession`,
   covered in full in the **Typed results + run end-to-end** step below.
+
+Notice `reference` and `bankName` travel two different ways: they go into the `PipeRequest`'s
+`extras` `Bundle` *and* the pane opens with them (`KycVerifierService.onOpenPane` reads them
+synchronously to build `KycPaneView` before any message loop exists), while `level` travels only
+as the typed `KycRequest` sent over `session.send(...)` once the pane is already mounted. That's
+not an accident — it's the two-channel design covered next.
 
 ### Verify it
 
@@ -747,6 +767,24 @@ Time to install both apps and run the whole flow: bank opens verifier, verifier 
 wizard *inside* the bank's window, user completes it, verifier reports back, bank displays the
 result.
 
+This step is where the two channels this codelab uses actually meet:
+
+- **`extras` at mount time.** `reference` and `bankName` go into the `PipeRequest`'s `Bundle` and
+  are read synchronously by `KycVerifierService.onOpenPane` *before* `KycPaneView` exists — there
+  is no message loop yet to send a typed object into, so extras are the only channel available
+  this early.
+- **Typed `KycRequest`, host → verifier, after mount.** Once `onSession` hands back a live
+  `PipeSession`, the host calls `session.send(KycRequest(reference, KycLevel.ENHANCED))`. The
+  pane's `KycPaneView.onMessage` decodes it with `PipeCodec.decodeOrNull<KycRequest>(message)` and
+  updates a label on the consent screen — `Requested level: ENHANCED` — proving the typed message
+  actually reached the pane, not just the service.
+- **Typed `KycResult`, verifier → host.** Symmetric to the above: once the user finishes the
+  wizard, `KycVerifierService` calls `host.send(KycResult(...))`, and the host's
+  `session.messagesOf<KycResult>().firstOrNull()` decodes it back.
+
+`extras` carries what's needed to mount the pane at all; the typed messages carry the richer,
+post-mount conversation in both directions over the same CBOR-over-binder channel.
+
 ### Install both apps
 
 ```bash
@@ -768,11 +806,12 @@ adb -s emulator-5554 shell am start -n tech.ssemaj.pipe.kychost/.MainActivity
 ```
 
 Tap **Start verification** in Meridian Bank. VerifyID's pane appears full-screen, drawn *inside*
-Meridian Bank's own window (its process, the bank's window — that's the architecture). Step
-through **Continue → Capture → Capture → Done**.
+Meridian Bank's own window (its process, the bank's window — that's the architecture). The consent
+screen should read `Requested level: ENHANCED` — the typed `KycRequest` the host sent right after
+the session opened. Step through **Continue → Capture → Capture → Done**.
 
-Expected: the bank's status line reads `Verification APPROVED (ref MB-…)`, matching the
-screenshot from the introduction.
+Expected: the consent screen showed `Requested level: ENHANCED`, and the bank's status line reads
+`Verification APPROVED (ref MB-…)`, matching the screenshot from the introduction.
 
 ### Why `firstOrNull`, not `first`
 

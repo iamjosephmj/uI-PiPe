@@ -256,6 +256,8 @@ import tech.ssemaj.pipe.core.CloseReason
 import tech.ssemaj.pipe.core.PipeMessage
 import tech.ssemaj.pipe.provider.PipeContent
 import tech.ssemaj.pipe.samples.kyc.KycStatus
+import tech.ssemaj.pipe.serialization.PipeCodec
+import tech.ssemaj.pipe.samples.kyc.KycRequest
 
 /**
  * The verifier&#39;s UI, rendered inside the host&#39;s window as a uI-PiPe pane. A small mock wizard —
@@ -269,13 +271,21 @@ class KycPaneView(
 ) : PipeContent {
 
     private val flipper = ViewFlipper(ctx)
+    private lateinit var levelLabel: TextView
 
     override val view: View get() = flipper
 
     init {
         flipper.setBackgroundColor(Color.parseColor(&#34;#0D141D&#34;))
         flipper.addView(screen(ctx, &#34;Verify your identity&#34;,
-            &#34;VerifyID needs to confirm your identity for $bankName.&#34;, &#34;Continue&#34;) { flipper.showNext() })
+            &#34;VerifyID needs to confirm your identity for $bankName.&#34;, &#34;Continue&#34;) { flipper.showNext() }.also { consentScreen -&gt;
+            levelLabel = TextView(ctx).apply {
+                textSize = 13f
+                gravity = Gravity.CENTER
+                setTextColor(Color.parseColor(&#34;#8B98A5&#34;))
+            }
+            (consentScreen as LinearLayout).addView(levelLabel)
+        })
         flipper.addView(screen(ctx, &#34;Scan your ID&#34;,
             &#34;[ mock document frame ]\nNo real camera — this is a demo.&#34;, &#34;Capture&#34;) { flipper.showNext() })
         flipper.addView(screen(ctx, &#34;Liveness selfie&#34;,
@@ -300,11 +310,15 @@ class KycPaneView(
             })
         }
 
-    override fun onMessage(message: PipeMessage) { /* request handled in the service before mount */ }
+    override fun onMessage(message: PipeMessage) {
+        PipeCodec.decodeOrNull&lt;KycRequest&gt;(message)?.let { req -&gt;
+            levelLabel.text = &#34;Requested level: ${req.level}&#34;
+        }
+    }
     override fun onClosed(reason: CloseReason) { onClose() }
 }
 </code></pre>
-<p><code>PipeContent</code> is uI-PiPe&#39;s contract for &#34;the view you want rendered inside the host&#39;s window.&#34; <code>onMessage</code> receives further messages from the host after the pane is open; <code>onClosed</code> fires when the pane tears down for any reason.</p>
+<p><code>PipeContent</code> is uI-PiPe&#39;s contract for &#34;the view you want rendered inside the host&#39;s window.&#34; <code>onMessage</code> receives further messages from the host after the pane is open — here it decodes the typed <code>KycRequest</code> the bank sends right after the session opens and reflects the requested level on the consent screen; <code>onClosed</code> fires when the pane tears down for any reason.</p>
 <h2 is-upgraded>The provider service</h2>
 <p><code>sample-kyc-verifier/src/main/java/tech/ssemaj/pipe/kycverifier/KycVerifierService.kt</code>:</p>
 <pre><code language="language-kotlin" class="language-kotlin">package tech.ssemaj.pipe.kycverifier
@@ -459,7 +473,7 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         const val VERIFIER_PKG = &#34;tech.ssemaj.pipe.kycverifier&#34;
         const val VERIFIER_SVC = &#34;tech.ssemaj.pipe.kycverifier.KycVerifierService&#34;
-        // Filled in Task 4 with VerifyID&#39;s real signing-cert SHA-256 (lowercase hex, no colons).
+        // VerifyID&#39;s signing-cert SHA-256 (lowercase hex, no colons) — the pinned provider identity.
         const val VERIFIER_CERT_SHA256 = &#34;21027f81c7dacf5c09246d1eb6e61a4ea797ef5a8e198e74721be8739cd3e706&#34;
     }
 
@@ -474,7 +488,6 @@ class MainActivity : AppCompatActivity() {
             val extras = Bundle().apply {
                 putString(&#34;reference&#34;, reference)
                 putString(&#34;bankName&#34;, &#34;Meridian Bank&#34;)
-                putString(&#34;level&#34;, KycLevel.ENHANCED.name)
             }
             PipeFullScreen.open(
                 activity = this,
@@ -517,6 +530,7 @@ class MainActivity : AppCompatActivity() {
 <li><strong><code>PipeAuthorizers.allowlist(VERIFIER_CERT_SHA256)</code></strong> — the identity gate. Covered in full in the next step.</li>
 <li><strong>Graceful failure handling</strong> — the two <code>lifecycleScope.launch</code> blocks inside <code>onSession</code>, covered in full in the <strong>Typed results + run end-to-end</strong> step below.</li>
 </ul>
+<p>Notice <code>reference</code> and <code>bankName</code> travel two different ways: they go into the <code>PipeRequest</code>&#39;s <code>extras</code> <code>Bundle</code> <em>and</em> the pane opens with them (<code>KycVerifierService.onOpenPane</code> reads them synchronously to build <code>KycPaneView</code> before any message loop exists), while <code>level</code> travels only as the typed <code>KycRequest</code> sent over <code>session.send(...)</code> once the pane is already mounted. That&#39;s not an accident — it&#39;s the two-channel design covered next.</p>
 <h2 is-upgraded>Verify it</h2>
 <pre><code language="language-bash" class="language-bash">./gradlew :sample-kyc-host:assembleDebug
 </code></pre>
@@ -566,6 +580,13 @@ adb -s emulator-5554 shell am start -n tech.ssemaj.pipe.kychost/.MainActivity
     
       <google-codelab-step label="Typed results &#43; run end-to-end (dev)" duration="5">
         <p>Time to install both apps and run the whole flow: bank opens verifier, verifier renders its wizard <em>inside</em> the bank&#39;s window, user completes it, verifier reports back, bank displays the result.</p>
+<p>This step is where the two channels this codelab uses actually meet:</p>
+<ul>
+<li><strong><code>extras</code></strong><strong> at mount time. </strong><code>reference</code> and <code>bankName</code> go into the <code>PipeRequest</code>&#39;s <code>Bundle</code> and are read synchronously by <code>KycVerifierService.onOpenPane</code> <em>before </em><code>KycPaneView</code> exists — there is no message loop yet to send a typed object into, so extras are the only channel available this early.</li>
+<li><strong>Typed </strong><strong><code>KycRequest</code></strong><strong>, host → verifier, after mount.</strong> Once <code>onSession</code> hands back a live <code>PipeSession</code>, the host calls <code>session.send(KycRequest(reference, KycLevel.ENHANCED))</code>. The pane&#39;s <code>KycPaneView.onMessage</code> decodes it with <code>PipeCodec.decodeOrNull<KycRequest>(message)</code> and updates a label on the consent screen — <code>Requested level: ENHANCED</code> — proving the typed message actually reached the pane, not just the service.</li>
+<li><strong>Typed </strong><strong><code>KycResult</code></strong><strong>, verifier → host.</strong> Symmetric to the above: once the user finishes the wizard, <code>KycVerifierService</code> calls <code>host.send(KycResult(...))</code>, and the host&#39;s <code>session.messagesOf<KycResult>().firstOrNull()</code> decodes it back.</li>
+</ul>
+<p><code>extras</code> carries what&#39;s needed to mount the pane at all; the typed messages carry the richer, post-mount conversation in both directions over the same CBOR-over-binder channel.</p>
 <h2 is-upgraded>Install both apps</h2>
 <pre><code language="language-bash" class="language-bash">export JAVA_HOME=/home/joseph/.jdks/temurin-23.0.2
 export PATH=&#34;$HOME/Android/Sdk/platform-tools:$PATH&#34;
@@ -576,8 +597,8 @@ export PATH=&#34;$HOME/Android/Sdk/platform-tools:$PATH&#34;
 <h2 is-upgraded>Run the happy path</h2>
 <pre><code language="language-bash" class="language-bash">adb -s emulator-5554 shell am start -n tech.ssemaj.pipe.kychost/.MainActivity
 </code></pre>
-<p>Tap <strong>Start verification</strong> in Meridian Bank. VerifyID&#39;s pane appears full-screen, drawn <em>inside</em> Meridian Bank&#39;s own window (its process, the bank&#39;s window — that&#39;s the architecture). Step through <strong>Continue → Capture → Capture → Done</strong>.</p>
-<p>Expected: the bank&#39;s status line reads <code>Verification APPROVED (ref MB-...)</code>, matching the screenshot from the introduction.</p>
+<p>Tap <strong>Start verification</strong> in Meridian Bank. VerifyID&#39;s pane appears full-screen, drawn <em>inside</em> Meridian Bank&#39;s own window (its process, the bank&#39;s window — that&#39;s the architecture). The consent screen should read <code>Requested level: ENHANCED</code> — the typed <code>KycRequest</code> the host sent right after the session opened. Step through <strong>Continue → Capture → Capture → Done</strong>.</p>
+<p>Expected: the consent screen showed <code>Requested level: ENHANCED</code>, and the bank&#39;s status line reads <code>Verification APPROVED (ref MB-...)</code>, matching the screenshot from the introduction.</p>
 <h2 is-upgraded>Why <code>firstOrNull</code>, not <code>first</code></h2>
 <p>Look again at the result-await coroutine inside <code>onSession</code>:</p>
 <pre><code language="language-kotlin" class="language-kotlin">lifecycleScope.launch {
