@@ -85,10 +85,10 @@ In `settings.gradle.kts`, add after `include(":sample-contract")`:
 ```kotlin
 include(":sample-kyc-contract")
 ```
-In root `build.gradle.kts`, change the `ignoredProjects` line to include the new modules:
+In root `build.gradle.kts`, add **only this module** to the `ignoredProjects` line (bcv 0.16.3 rejects `ignoredProjects` entries for projects that don't exist yet, so `sample-kyc-host`/`sample-kyc-verifier` are added in their own creating tasks):
 ```kotlin
 apiValidation {
-    ignoredProjects.addAll(listOf("sample-host", "sample-provider", "evil-host", "evil-provider", "sample-contract", "sample-kyc-contract", "sample-kyc-host", "sample-kyc-verifier"))
+    ignoredProjects.addAll(listOf("sample-host", "sample-provider", "evil-host", "evil-provider", "sample-contract", "sample-kyc-contract"))
 }
 ```
 
@@ -197,6 +197,7 @@ git commit -m "feat: add :sample-kyc-contract shared wire types for the KYC code
 - Create: `sample-kyc-verifier/src/main/java/tech/ssemaj/pipe/kycverifier/KycPaneView.kt`
 - Create: `security/kyc-verifier.keystore` (generated in a step below)
 - Modify: `settings.gradle.kts` (add `include(":sample-kyc-verifier")`)
+- Modify: `build.gradle.kts` (add `"sample-kyc-verifier"` to `apiValidation.ignoredProjects`)
 
 **Interfaces:**
 - Consumes: `KycContract.ACTION_KYC`, `KycRequest`, `KycResult`, `KycLevel`, `KycStatus` (Task 1); `PipeProviderService`, `PaneResult.Content`, `PipeContent`, `HostHandle`, `PipeCodec`, `HostHandle.send<T>` (uI-PiPe).
@@ -207,6 +208,10 @@ git commit -m "feat: add :sample-kyc-contract shared wire types for the KYC code
 In `settings.gradle.kts` add:
 ```kotlin
 include(":sample-kyc-verifier")
+```
+In root `build.gradle.kts`, add `"sample-kyc-verifier"` to the `apiValidation.ignoredProjects` list (app modules must be ignored or bcv demands an API dump):
+```kotlin
+    ignoredProjects.addAll(listOf("sample-host", "sample-provider", "evil-host", "evil-provider", "sample-contract", "sample-kyc-contract", "sample-kyc-verifier"))
 ```
 
 - [ ] **Step 2: Generate the verifier's own signing key**
@@ -418,6 +423,7 @@ git commit -m "feat: add :sample-kyc-verifier mock KYC provider app (VerifyID)"
 - Create: `sample-kyc-host/src/main/res/layout/activity_main.xml`
 - Create: `sample-kyc-host/src/main/java/tech/ssemaj/pipe/kychost/MainActivity.kt`
 - Modify: `settings.gradle.kts` (add `include(":sample-kyc-host")`)
+- Modify: `build.gradle.kts` (add `"sample-kyc-host"` to `apiValidation.ignoredProjects`)
 
 **Interfaces:**
 - Consumes: `KycContract.ACTION_KYC`, `KycRequest`, `KycResult`, `KycLevel`, `KycStatus` (Task 1); `PipeFullScreen.open`, `ProviderComponent`, `PipeAuthorizers.allowlist`, `PipeSession`, `PipeState`, `PipeException`, `PipeDeniedException`, `PipeCodec`/`messagesOf`/`send<T>` (uI-PiPe). Binds the verifier service from Task 2.
@@ -428,6 +434,10 @@ git commit -m "feat: add :sample-kyc-verifier mock KYC provider app (VerifyID)"
 In `settings.gradle.kts` add:
 ```kotlin
 include(":sample-kyc-host")
+```
+In root `build.gradle.kts`, add `"sample-kyc-host"` to the `apiValidation.ignoredProjects` list:
+```kotlin
+    ignoredProjects.addAll(listOf("sample-host", "sample-provider", "evil-host", "evil-provider", "sample-contract", "sample-kyc-contract", "sample-kyc-verifier", "sample-kyc-host"))
 ```
 
 - [ ] **Step 2: Write the module build file**
@@ -510,6 +520,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import tech.ssemaj.pipe.auth.PipeAuthorizers
 import tech.ssemaj.pipe.core.PipeDeniedException
@@ -554,8 +565,13 @@ class MainActivity : AppCompatActivity() {
                 onSession = { session ->
                     lifecycleScope.launch {
                         session.send(KycRequest(reference, KycLevel.ENHANCED))
-                        val result = session.messagesOf<KycResult>().first()
-                        status.text = "Verification ${result.status} (ref ${result.reference})"
+                        // firstOrNull (not first): if the verifier dies before sending a result
+                        // (e.g. RASP self-terminates), the flow closes empty — return null and let
+                        // the state-close collector below render the graceful failure message.
+                        val result = session.messagesOf<KycResult>().firstOrNull()
+                        if (result != null) {
+                            status.text = "Verification ${result.status} (ref ${result.reference})"
+                        }
                     }
                     // Graceful teardown: a non-null Closed cause (e.g. RASP killed the verifier) is
                     // an unexpected failure, not a normal close.
