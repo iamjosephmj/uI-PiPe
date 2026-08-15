@@ -16,6 +16,7 @@ activityCompose = "1.10.1"
 activity = "1.10.1"
 material = "1.12.0"
 bouncycastle = "1.78.1"
+hydra = "2.3.0"
 
 [libraries]
 junit = { module = "junit:junit", version.ref = "junit" }
@@ -50,3 +51,4 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 binary-compatibility-validator = { id = "org.jetbrains.kotlinx.binary-compatibility-validator", version.ref = "bcv" }
+hydra = { id = "tech.thessemaj.hydra", version.ref = "hydra" }

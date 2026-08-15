@@ -1,0 +1,761 @@
+
+<!doctype html>
+
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+  <meta name="theme-color" content="#4F7DC9">
+  <meta charset="UTF-8">
+  <title>Embed a RASP-guarded KYC verifier with uI-PiPe</title>
+  <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Source+Code+Pro:400|Roboto:400,300,400italic,500,700|Roboto+Mono">
+  <link rel="stylesheet" href="//fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://storage.googleapis.com/claat-public/codelab-elements.css">
+  <style>
+    .success {
+      color: #1e8e3e;
+    }
+    .error {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <google-codelab-analytics gaid="UA-49880327-14"></google-codelab-analytics>
+  <google-codelab codelab-gaid=""
+                  id="uipipe-kyc-codelab"
+                  title="Embed a RASP-guarded KYC verifier with uI-PiPe"
+                  environment="web"
+                  feedback-link="https://github.com/iamjosephmj/uI-PiPe/issues">
+    
+      <google-codelab-step label="Introduction" duration="3">
+        <p><strong>What you&#39;ll build: </strong><em>Meridian Bank</em> (the host app) embeds <em>VerifyID</em> — a separately-signed, RASP-guarded KYC verifier — as a live, full-screen pane inside its own window. VerifyID runs in its own process, under its own signing key, and the bank only ever hands it the window token after cryptographically verifying its identity.</p>
+<p>Two independent security layers are at work:</p>
+<ol type="1">
+<li><strong>uI-PiPe&#39;s identity gate</strong> — the host only opens a pane for a provider whose signing-cert SHA-256 is on an explicit allowlist. No self-reported package name is ever trusted.</li>
+<li><strong>hydra&#39;s runtime self-protection (RASP)</strong> — the verifier&#39;s <code>guarded</code> build detects a compromised runtime (root, emulator, tampering) and terminates itself <em>before</em> any KYC UI or logic runs.</li>
+</ol>
+<p>By the end of this codelab you will have:</p>
+<ul>
+<li>A shared, pure-Kotlin wire contract (<code>:sample-kyc-contract</code>) used by both apps.</li>
+<li>A KYC verifier app (<code>:sample-kyc-verifier</code>, &#34;VerifyID&#34;) that renders a mock identity wizard inside the host&#39;s window and reports a typed result back.</li>
+<li>A bank host app (<code>:sample-kyc-host</code>, &#34;Meridian Bank&#34;) that opens the verifier, pins its exact signing certificate, and gracefully survives the verifier&#39;s process being killed mid-flow.</li>
+<li>A hydra-guarded (<code>-Prasp</code>) build of the verifier that self-terminates on an untrusted runtime — and a host that degrades gracefully instead of crashing when that happens.</li>
+</ul>
+<p>Here&#39;s the finished happy path — Meridian Bank showing the verifier&#39;s <code>APPROVED</code> result:</p>
+<p class="image-container"><img alt="Meridian Bank showing Verification APPROVED after VerifyID&amp;rsquo;s wizard completes" src="img/19ec62bf12860708.png"></p>
+<p>And here&#39;s the RASP finale — the guarded verifier killed itself before it could reply, and the host recovered gracefully instead of crashing:</p>
+<p class="image-container"><img alt="Meridian Bank showing &amp;ldquo;Verification unavailable: runtime integrity check failed&amp;rdquo; after the guarded verifier was killed by RASP" src="img/a93021afe95112a9.png"></p>
+<h2 is-upgraded>Prerequisites</h2>
+<ul>
+<li>A working uI-PiPe checkout (this codelab builds inside the <code>pipe</code> monorepo — <code>:pipe</code> and <code>:pipe-serialization</code> are existing modules you depend on, not something you copy in).</li>
+<li>Android Studio / a JDK 17 toolchain, <code>compileSdk</code>/<code>targetSdk</code> 36, <code>minSdk</code> 30.</li>
+<li>An emulator or device running API 30+ for the on-device steps.</li>
+</ul>
+<h2 is-upgraded>What you&#39;ll need to know</h2>
+<p>Basic Kotlin, Android <code>Service</code>/<code>Activity</code> fundamentals, and Gradle Kotlin DSL. No prior uI-PiPe experience is assumed — each step explains the relevant API as it&#39;s introduced.</p>
+<p>Positive : uI-PiPe&#39;s trust model is: verify who is asking (kernel/PackageManager-derived signing identity, never self-reported), <em>then</em> hand over the window. Everything else in this codelab builds on that one idea.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Project setup" duration="4">
+        <p>This codelab adds three new Gradle modules to the existing <code>pipe</code> monorepo: a shared contract module, the verifier app, and the host app. All three depend on the repo&#39;s existing <code>:pipe</code> and <code>:pipe-serialization</code> modules — you are not vendoring or copying uI-PiPe itself.</p>
+<h2 is-upgraded>Register the modules</h2>
+<p>In the root <code>settings.gradle.kts</code>, the three new modules sit alongside the existing sample modules:</p>
+<pre><code language="language-kotlin" class="language-kotlin">pluginManagement {
+    repositories { google(); mavenCentral(); gradlePluginPortal() }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+rootProject.name = &#34;pipe&#34;
+include(&#34;:pipe&#34;)
+include(&#34;:pipe-serialization&#34;)
+include(&#34;:sample-contract&#34;)
+include(&#34;:sample-kyc-contract&#34;)
+include(&#34;:sample-kyc-verifier&#34;)
+include(&#34;:sample-kyc-host&#34;)
+include(&#34;:sample-provider&#34;)
+include(&#34;:sample-host&#34;)
+include(&#34;:sample-solo&#34;)
+include(&#34;:evil-provider&#34;)
+include(&#34;:evil-host&#34;)
+</code></pre>
+<p>(The <code>dependencyResolutionManagement.repositories</code> block above will grow a third, hydra-specific repo entry in the <strong>Add RASP with hydra</strong> step later — leave it as shown for now.)</p>
+<h2 is-upgraded>Opt the app modules out of API tracking</h2>
+<p>The root <code>build.gradle.kts</code> runs <a href="https://github.com/Kotlin/binary-compatibility-validator" target="_blank">binary-compatibility-validator</a> (<code>bcv</code>) across the repo to catch accidental public-API breaks in the <em>library</em> modules. App modules (the samples, and now the KYC trio) don&#39;t ship a public API, so they&#39;re excluded:</p>
+<pre><code language="language-kotlin" class="language-kotlin">plugins {
+    alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.kotlin.android) apply false
+    alias(libs.plugins.kotlin.parcelize) apply false
+    alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.binary.compatibility.validator)
+}
+
+apiValidation {
+    ignoredProjects.addAll(listOf(&#34;sample-host&#34;, &#34;sample-provider&#34;, &#34;evil-host&#34;, &#34;evil-provider&#34;, &#34;sample-contract&#34;, &#34;sample-kyc-contract&#34;, &#34;sample-kyc-verifier&#34;, &#34;sample-kyc-host&#34;))
+}
+</code></pre>
+<p>Negative : <code>bcv</code> 0.16.3 rejects <code>ignoredProjects</code> entries for modules that don&#39;t exist yet. If you&#39;re following along by creating modules one at a time, only add each module&#39;s name once its <code>build.gradle.kts</code> exists — otherwise the Gradle sync fails.</p>
+<h2 is-upgraded>Verify it</h2>
+<pre><code language="language-bash" class="language-bash">./gradlew projects
+</code></pre>
+<p>Expected: the project list includes <code>:sample-kyc-contract</code>, <code>:sample-kyc-verifier</code>, and <code>:sample-kyc-host</code> (their build files don&#39;t exist yet — that&#39;s the next three steps — so a full build will not succeed until then).</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="The shared contract" duration="3">
+        <p><code>:sample-kyc-contract</code> is a <strong>pure-JVM Kotlin module</strong> — no Android dependency at all — holding the wire types both apps agree on. Keeping it Android-free means it compiles fast and its round trips can be unit-tested on the JVM without an emulator.</p>
+<h2 is-upgraded>Module build file</h2>
+<p><code>sample-kyc-contract/build.gradle.kts</code>:</p>
+<pre><code language="language-kotlin" class="language-kotlin">plugins {
+    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
+}
+
+java { toolchain { languageVersion.set(JavaLanguageVersion.of(17)) } }
+
+dependencies {
+    api(libs.kotlinx.serialization.cbor)
+    testImplementation(libs.junit)
+}
+</code></pre>
+<p>It depends on <code>kotlinx-serialization-cbor</code> because <code>:pipe-serialization</code> (used by both apps to send typed messages) carries <code>@Serializable</code> payloads over the wire as CBOR.</p>
+<h2 is-upgraded>The contract types</h2>
+<p><code>sample-kyc-contract/src/main/kotlin/tech/ssemaj/pipe/samples/kyc/KycContract.kt</code>:</p>
+<pre><code language="language-kotlin" class="language-kotlin">package tech.ssemaj.pipe.samples.kyc
+
+import kotlinx.serialization.Serializable
+
+/** Shared wire contract for the KYC codelab. Pure-JVM so both the host and verifier apps can depend on it. */
+object KycContract {
+    /** Request action the bank host opens the verifier with. */
+    const val ACTION_KYC = &#34;pipe.demo.kyc&#34;
+}
+
+/** Depth of the identity check the bank is asking for (mock). */
+@Serializable
+enum class KycLevel { BASIC, ENHANCED }
+
+/** Outcome the verifier reports back to the bank (mock). */
+@Serializable
+enum class KycStatus { APPROVED, DECLINED, ERROR }
+
+/** Bank → verifier: start a verification for an opaque [reference] at the requested [level]. */
+@Serializable
+data class KycRequest(val reference: String, val level: KycLevel)
+
+/** Verifier → bank: the result for [reference]. [issuedAtEpochMs] is a wall-clock stamp set by the verifier. */
+@Serializable
+data class KycResult(val reference: String, val status: KycStatus, val issuedAtEpochMs: Long)
+</code></pre>
+<p>Four types, deliberately small:</p>
+<ul>
+<li><code>KycContract.ACTION_KYC</code> — the intent action the pane request is opened with. It plays the same role as an intent action does for <code>startActivity</code> — it says <em>what</em> is being requested, not <em>who</em> is being asked.</li>
+<li><code>KycRequest</code> — sent host → verifier once the pane is open, carrying the bank&#39;s own opaque correlation id (<code>reference</code>) and the requested depth (<code>level</code>).</li>
+<li><code>KycResult</code> — sent verifier → host with the outcome and a timestamp.</li>
+<li><code>KycLevel</code> / <code>KycStatus</code> — small closed enums so both sides exhaustively handle every case.</li>
+</ul>
+<h2 is-upgraded>Verify it</h2>
+<pre><code language="language-bash" class="language-bash">./gradlew :sample-kyc-contract:test
+</code></pre>
+<p>Expected: <code>BUILD SUCCESSFUL</code>. A round-trip test (<code>KycContractRoundTripTest</code>) CBOR-encodes and decodes both <code>KycRequest</code> and <code>KycResult</code> and asserts equality — cheap insurance that the <code>@Serializable</code> types stay wire-compatible as you evolve them.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Build the KYC verifier" duration="6">
+        <p><code>:sample-kyc-verifier</code> is VerifyID — an installable app whose only job is to expose one <code>PipeProviderService</code> that renders a mock identity wizard and reports back a typed <code>KycResult</code>.</p>
+<h2 is-upgraded>Generate VerifyID&#39;s own signing key</h2>
+<p>VerifyID is deliberately signed with a <strong>different key</strong> than the bank host — that&#39;s the whole point of the trust boundary you&#39;ll pin two steps from now. Generate it once, from the repo root:</p>
+<pre><code language="language-bash" class="language-bash">keytool -genkeypair -v -keystore security/kyc-verifier.keystore \
+  -alias verifier -keyalg RSA -keysize 2048 -validity 10000 \
+  -storepass verifierpass -keypass verifierpass \
+  -dname &#34;CN=VerifyID, O=VerifyID Inc, C=US&#34;
+</code></pre>
+<p>Expected: <code>security/kyc-verifier.keystore</code> is created.</p>
+<h2 is-upgraded>Module build file</h2>
+<p><code>sample-kyc-verifier/build.gradle.kts</code>:</p>
+<pre><code language="language-kotlin" class="language-kotlin">plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+}
+
+// RASP is opt-in: `-Prasp` applies the hydra plugin (lethal, physical-device only). A plain build
+// stays emulator-runnable. Gradle plugins are module-global, so this gates the whole module build.
+val raspEnabled = providers.gradleProperty(&#34;rasp&#34;).isPresent
+if (raspEnabled) apply(plugin = libs.plugins.hydra.get().pluginId)
+
+android {
+    namespace = &#34;tech.ssemaj.pipe.kycverifier&#34;
+    compileSdk = 36
+    defaultConfig {
+        applicationId = if (raspEnabled) &#34;tech.ssemaj.pipe.kycverifier.guarded&#34; else &#34;tech.ssemaj.pipe.kycverifier&#34;
+        minSdk = 30
+        targetSdk = 36
+        versionCode = 1
+        versionName = &#34;1.0&#34;
+    }
+    signingConfigs {
+        create(&#34;verifier&#34;) {
+            storeFile = rootProject.file(&#34;security/kyc-verifier.keystore&#34;)
+            storePassword = &#34;verifierpass&#34;
+            keyAlias = &#34;verifier&#34;
+            keyPassword = &#34;verifierpass&#34;
+        }
+    }
+    buildTypes {
+        getByName(&#34;debug&#34;) { signingConfig = signingConfigs.getByName(&#34;verifier&#34;) }
+    }
+    compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+    kotlinOptions { jvmTarget = &#34;17&#34; }
+}
+dependencies {
+    implementation(project(&#34;:pipe&#34;))
+    implementation(project(&#34;:pipe-serialization&#34;))
+    implementation(project(&#34;:sample-kyc-contract&#34;))
+    implementation(libs.appcompat)
+    implementation(libs.coroutines.android)
+}
+</code></pre>
+<p>Ignore the <code>raspEnabled</code> / hydra lines for now — they&#39;re explained in full in the <strong>Add RASP with hydra</strong> step. For this step, treat the module as if that <code>if</code> block never fires: a plain <code>applicationId = "tech.ssemaj.pipe.kycverifier"</code>, signed with <code>security/kyc-verifier.keystore</code>.</p>
+<h2 is-upgraded>The manifest</h2>
+<p><code>sample-kyc-verifier/src/main/AndroidManifest.xml</code>:</p>
+<pre><code language="language-xml" class="language-xml">&lt;manifest xmlns:android=&#34;http://schemas.android.com/apk/res/android&#34;&gt;
+    &lt;application android:label=&#34;VerifyID&#34;&gt;
+        &lt;service
+            android:name=&#34;.KycVerifierService&#34;
+            android:exported=&#34;true&#34;&gt;
+            &lt;intent-filter&gt;
+                &lt;action android:name=&#34;tech.ssemaj.pipe.action.OPEN_PANE&#34; /&gt;
+            &lt;/intent-filter&gt;
+        &lt;/service&gt;
+    &lt;/application&gt;
+&lt;/manifest&gt;
+</code></pre>
+<p><code>android:exported="true"</code> plus the <code>tech.ssemaj.pipe.action.OPEN_PANE</code> intent filter is what makes a service bindable as a uI-PiPe provider at all — the library looks for exactly this action when the host resolves the component.</p>
+<h2 is-upgraded>The pane UI</h2>
+<p><code>sample-kyc-verifier/src/main/java/tech/ssemaj/pipe/kycverifier/KycPaneView.kt</code> — a small <code>ViewFlipper</code> wizard (Consent → mock ID capture → mock selfie → Verified), driven programmatically:</p>
+<pre><code language="language-kotlin" class="language-kotlin">package tech.ssemaj.pipe.kycverifier
+
+import android.content.Context
+import android.graphics.Color
+import android.view.Gravity
+import android.view.View
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.ViewFlipper
+import tech.ssemaj.pipe.core.CloseReason
+import tech.ssemaj.pipe.core.PipeMessage
+import tech.ssemaj.pipe.provider.PipeContent
+import tech.ssemaj.pipe.samples.kyc.KycStatus
+import tech.ssemaj.pipe.serialization.PipeCodec
+import tech.ssemaj.pipe.samples.kyc.KycRequest
+
+/**
+ * The verifier&#39;s UI, rendered inside the host&#39;s window as a uI-PiPe pane. A small mock wizard —
+ * no real camera or PII. [onDecision] is invoked once with the user&#39;s outcome; [onClose] dismisses.
+ */
+class KycPaneView(
+    ctx: Context,
+    private val bankName: String,
+    private val onDecision: (KycStatus) -&gt; Unit,
+    private val onClose: () -&gt; Unit,
+) : PipeContent {
+
+    private val flipper = ViewFlipper(ctx)
+    private lateinit var levelLabel: TextView
+
+    override val view: View get() = flipper
+
+    init {
+        flipper.setBackgroundColor(Color.parseColor(&#34;#0D141D&#34;))
+        flipper.addView(screen(ctx, &#34;Verify your identity&#34;,
+            &#34;VerifyID needs to confirm your identity for $bankName.&#34;, &#34;Continue&#34;) { flipper.showNext() }.also { consentScreen -&gt;
+            levelLabel = TextView(ctx).apply {
+                textSize = 13f
+                gravity = Gravity.CENTER
+                setTextColor(Color.parseColor(&#34;#8B98A5&#34;))
+            }
+            (consentScreen as LinearLayout).addView(levelLabel)
+        })
+        flipper.addView(screen(ctx, &#34;Scan your ID&#34;,
+            &#34;[ mock document frame ]\nNo real camera — this is a demo.&#34;, &#34;Capture&#34;) { flipper.showNext() })
+        flipper.addView(screen(ctx, &#34;Liveness selfie&#34;,
+            &#34;[ mock selfie frame ]\nNo real camera — this is a demo.&#34;, &#34;Capture&#34;) { flipper.showNext() })
+        flipper.addView(screen(ctx, &#34;Verified ✓&#34;,
+            &#34;Identity confirmed for $bankName.&#34;, &#34;Done&#34;) { onDecision(KycStatus.APPROVED) })
+    }
+
+    private fun screen(ctx: Context, title: String, body: String, cta: String, onCta: () -&gt; Unit): View =
+        LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(72, 72, 72, 72)
+            addView(TextView(ctx).apply { text = title; textSize = 24f; setTextColor(Color.WHITE) })
+            addView(TextView(ctx).apply {
+                text = &#34;\n$body\n&#34;; textSize = 15f; gravity = Gravity.CENTER
+                setTextColor(Color.parseColor(&#34;#8B98A5&#34;))
+            })
+            addView(Button(ctx).apply { text = cta; setOnClickListener { onCta() } })
+            addView(Button(ctx).apply {
+                text = &#34;Cancel&#34;; setOnClickListener { onDecision(KycStatus.DECLINED) }
+            })
+        }
+
+    override fun onMessage(message: PipeMessage) {
+        PipeCodec.decodeOrNull&lt;KycRequest&gt;(message)?.let { req -&gt;
+            levelLabel.text = &#34;Requested level: ${req.level}&#34;
+        }
+    }
+    override fun onClosed(reason: CloseReason) { onClose() }
+}
+</code></pre>
+<p><code>PipeContent</code> is uI-PiPe&#39;s contract for &#34;the view you want rendered inside the host&#39;s window.&#34; <code>onMessage</code> receives further messages from the host after the pane is open — here it decodes the typed <code>KycRequest</code> the bank sends right after the session opens and reflects the requested level on the consent screen; <code>onClosed</code> fires when the pane tears down for any reason.</p>
+<h2 is-upgraded>The provider service</h2>
+<p><code>sample-kyc-verifier/src/main/java/tech/ssemaj/pipe/kycverifier/KycVerifierService.kt</code>:</p>
+<pre><code language="language-kotlin" class="language-kotlin">package tech.ssemaj.pipe.kycverifier
+
+import kotlinx.coroutines.launch
+import tech.ssemaj.pipe.auth.AuthDecision
+import tech.ssemaj.pipe.auth.PipeAuthorizer
+import tech.ssemaj.pipe.core.PipeRequest
+import tech.ssemaj.pipe.provider.HostHandle
+import tech.ssemaj.pipe.provider.PaneResult
+import tech.ssemaj.pipe.provider.PipeProviderService
+import tech.ssemaj.pipe.samples.kyc.KycResult
+import tech.ssemaj.pipe.samples.kyc.KycStatus
+import tech.ssemaj.pipe.serialization.send
+
+/**
+ * VerifyID&#39;s KYC provider. Renders a mock verification wizard in the bank&#39;s window and returns a
+ * typed [KycResult]. In the `guarded` build (Task 5) hydra RASP self-terminates this process on a
+ * compromised runtime, before any of this runs.
+ */
+class KycVerifierService : PipeProviderService() {
+
+    // Host→verifier pinning is the codelab&#39;s lesson: the BANK pins US. We accept the bank as-is.
+    // In production you would pin the bank&#39;s cert here too (symmetric); see the codelab callout.
+    override fun authorizer(): PipeAuthorizer = PipeAuthorizer { _, _ -&gt; AuthDecision.Allow }
+
+    override suspend fun onOpenPane(request: PipeRequest, host: HostHandle): PaneResult {
+        // The bank&#39;s opaque correlation id, echoed back in the result.
+        val reference = request.extras.getString(&#34;reference&#34;) ?: &#34;unknown&#34;
+        val bankName = request.extras.getString(&#34;bankName&#34;) ?: &#34;the bank&#34;
+
+        val content = KycPaneView(
+            ctx = this,
+            bankName = bankName,
+            onDecision = { status -&gt;
+                paneScope.launch {
+                    host.send(KycResult(reference, status, System.currentTimeMillis()))
+                    host.close()
+                }
+            },
+            onClose = {},
+        )
+        return PaneResult.Content(content)
+    }
+}
+</code></pre>
+<p>Two things worth calling out explicitly:</p>
+<p>Positive : <strong><code>authorizer()</code></strong></p>
+<p><strong> is overridden, and it matters why.</strong> Every <code>PipeProviderService</code> has a default <code>authorizer()</code> — <code>PipeAuthorizers.sameSigningKey(context)</code> — that only admits callers signed with <em>the provider&#39;s own key</em>. VerifyID and Meridian Bank are signed with two different keys by design (that&#39;s the trust boundary this whole codelab teaches), so the default would reject the bank outright. VerifyID overrides <code>authorizer()</code> to <code>AuthDecision.Allow</code> unconditionally — it trusts <em>any</em> caller for <code>onOpenPane</code>, and instead relies entirely on the <strong>host</strong> pinning <em>VerifyID&#39;s</em> cert (next step) to keep the channel safe. This is a one-directional trust decision, made deliberately, not an oversight — see the callout in <strong>Pin the trust boundary</strong>.</p>
+<ul>
+<li><code>host.send(KycResult(...))</code> and <code>host.close()</code> use <code>:pipe-serialization</code>&#39;s typed <code>send<T></code> extension — the same CBOR-over-binder channel described in the main README&#39;s &#34;Typed messaging&#34; section — to hand the result back and then tear the pane down from the provider side.</li>
+</ul>
+<h2 is-upgraded>Verify it</h2>
+<pre><code language="language-bash" class="language-bash">./gradlew :sample-kyc-verifier:assembleDebug
+</code></pre>
+<p>Expected: <code>BUILD SUCCESSFUL</code>; an APK at <code>sample-kyc-verifier/build/outputs/apk/debug/sample-kyc-verifier-debug.apk</code>, signed with <code>security/kyc-verifier.keystore</code>.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Build the bank host" duration="5">
+        <p><code>:sample-kyc-host</code> is Meridian Bank — a one-screen app that opens VerifyID as a full-screen pane, sends it a <code>KycRequest</code>, and reacts to the typed <code>KycResult</code> (or to failure).</p>
+<h2 is-upgraded>Module build file</h2>
+<p><code>sample-kyc-host/build.gradle.kts</code> — note there is <strong>no </strong></p>
+<p><strong><code>signingConfigs</code></strong></p>
+<p><strong> block</strong>, so it&#39;s signed with Android&#39;s default debug key, deliberately different from VerifyID&#39;s:</p>
+<pre><code language="language-kotlin" class="language-kotlin">plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+}
+android {
+    namespace = &#34;tech.ssemaj.pipe.kychost&#34;
+    compileSdk = 36
+    defaultConfig {
+        applicationId = &#34;tech.ssemaj.pipe.kychost&#34;
+        minSdk = 30
+        targetSdk = 36
+        versionCode = 1
+        versionName = &#34;1.0&#34;
+    }
+    compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+    kotlinOptions { jvmTarget = &#34;17&#34; }
+}
+dependencies {
+    implementation(project(&#34;:pipe&#34;))
+    implementation(project(&#34;:pipe-serialization&#34;))
+    implementation(project(&#34;:sample-kyc-contract&#34;))
+    implementation(libs.appcompat)
+    implementation(libs.coroutines.android)
+    implementation(libs.androidx.lifecycle.runtime)
+}
+</code></pre>
+<h2 is-upgraded>The manifest — package visibility</h2>
+<p><code>sample-kyc-host/src/main/AndroidManifest.xml</code>:</p>
+<pre><code language="language-xml" class="language-xml">&lt;manifest xmlns:android=&#34;http://schemas.android.com/apk/res/android&#34;&gt;
+    &lt;queries&gt;
+        &lt;package android:name=&#34;tech.ssemaj.pipe.kycverifier&#34; /&gt;
+    &lt;/queries&gt;
+    &lt;application android:label=&#34;Meridian Bank&#34; android:theme=&#34;@style/Theme.AppCompat.Light.NoActionBar&#34;&gt;
+        &lt;activity android:name=&#34;.MainActivity&#34; android:exported=&#34;true&#34;&gt;
+            &lt;intent-filter&gt;
+                &lt;action android:name=&#34;android.intent.action.MAIN&#34; /&gt;
+                &lt;category android:name=&#34;android.intent.category.LAUNCHER&#34; /&gt;
+            &lt;/intent-filter&gt;
+        &lt;/activity&gt;
+    &lt;/application&gt;
+&lt;/manifest&gt;
+</code></pre>
+<p>The <code><queries></code> block is required on modern Android package-visibility rules — without it the host can&#39;t resolve or bind VerifyID&#39;s service at all, regardless of what uI-PiPe&#39;s own identity gate would decide.</p>
+<h2 is-upgraded>The layout</h2>
+<p><code>sample-kyc-host/src/main/res/layout/activity_main.xml</code> — a title, a status line, and one button:</p>
+<pre><code language="language-xml" class="language-xml">&lt;?xml version=&#34;1.0&#34; encoding=&#34;utf-8&#34;?&gt;
+&lt;LinearLayout xmlns:android=&#34;http://schemas.android.com/apk/res/android&#34;
+    android:layout_width=&#34;match_parent&#34; android:layout_height=&#34;match_parent&#34;
+    android:orientation=&#34;vertical&#34; android:gravity=&#34;center&#34; android:padding=&#34;24dp&#34;&gt;
+
+    &lt;TextView android:id=&#34;@+id/title&#34; android:layout_width=&#34;wrap_content&#34; android:layout_height=&#34;wrap_content&#34;
+        android:text=&#34;Meridian Bank&#34; android:textSize=&#34;28sp&#34; /&gt;
+    &lt;TextView android:id=&#34;@+id/status&#34; android:layout_width=&#34;wrap_content&#34; android:layout_height=&#34;wrap_content&#34;
+        android:layout_marginTop=&#34;12dp&#34; android:text=&#34;Account setup: identity check required&#34; /&gt;
+    &lt;Button android:id=&#34;@+id/verify&#34; android:layout_width=&#34;wrap_content&#34; android:layout_height=&#34;wrap_content&#34;
+        android:layout_marginTop=&#34;24dp&#34; android:text=&#34;Start verification&#34; /&gt;
+&lt;/LinearLayout&gt;
+</code></pre>
+<h2 is-upgraded>The Activity</h2>
+<p><code>sample-kyc-host/src/main/java/tech/ssemaj/pipe/kychost/MainActivity.kt</code> — this is the finished, final version (the <code>VERIFIER_CERT_SHA256</code> placeholder and the <code>firstOrNull</code> result-await are both explained in the next two steps; you&#39;re looking at the destination, not an intermediate draft):</p>
+<pre><code language="language-kotlin" class="language-kotlin">package tech.ssemaj.pipe.kychost
+
+import android.os.Bundle
+import android.widget.Button
+import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.launch
+import tech.ssemaj.pipe.auth.PipeAuthorizers
+import tech.ssemaj.pipe.core.PipeDeniedException
+import tech.ssemaj.pipe.core.PipeRequest
+import tech.ssemaj.pipe.core.PipeState
+import tech.ssemaj.pipe.host.PipeFullScreen
+import tech.ssemaj.pipe.host.ProviderComponent
+import tech.ssemaj.pipe.samples.kyc.KycContract
+import tech.ssemaj.pipe.samples.kyc.KycRequest
+import tech.ssemaj.pipe.samples.kyc.KycLevel
+import tech.ssemaj.pipe.samples.kyc.KycResult
+import tech.ssemaj.pipe.serialization.messagesOf
+import tech.ssemaj.pipe.serialization.send
+
+class MainActivity : AppCompatActivity() {
+
+    private companion object {
+        const val VERIFIER_PKG = &#34;tech.ssemaj.pipe.kycverifier&#34;
+        const val VERIFIER_SVC = &#34;tech.ssemaj.pipe.kycverifier.KycVerifierService&#34;
+        // VerifyID&#39;s signing-cert SHA-256 (lowercase hex, no colons) — the pinned provider identity.
+        const val VERIFIER_CERT_SHA256 = &#34;21027f81c7dacf5c09246d1eb6e61a4ea797ef5a8e198e74721be8739cd3e706&#34;
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+        val status = findViewById&lt;TextView&gt;(R.id.status)
+
+        findViewById&lt;Button&gt;(R.id.verify).setOnClickListener {
+            status.text = &#34;Opening VerifyID...&#34;
+            val reference = &#34;MB-&#34; + System.currentTimeMillis()
+            val extras = Bundle().apply {
+                putString(&#34;reference&#34;, reference)
+                putString(&#34;bankName&#34;, &#34;Meridian Bank&#34;)
+            }
+            PipeFullScreen.open(
+                activity = this,
+                provider = ProviderComponent(VERIFIER_PKG, VERIFIER_SVC),
+                request = PipeRequest(KycContract.ACTION_KYC, extras),
+                authorizer = PipeAuthorizers.allowlist(VERIFIER_CERT_SHA256),
+                onSession = { session -&gt;
+                    lifecycleScope.launch {
+                        session.send(KycRequest(reference, KycLevel.ENHANCED))
+                        val result = session.messagesOf&lt;KycResult&gt;().firstOrNull()
+                        if (result != null) {
+                            status.text = &#34;Verification ${result.status} (ref ${result.reference})&#34;
+                        }
+                        // else: session closed before a result (e.g. RASP killed the verifier);
+                        // the state-close collector below shows the failure message.
+                    }
+                    // Graceful teardown: a non-null Closed cause (e.g. RASP killed the verifier) is
+                    // an unexpected failure, not a normal close.
+                    lifecycleScope.launch {
+                        val closed = session.state.first { it is PipeState.Closed } as PipeState.Closed
+                        if (closed.cause != null) {
+                            status.text = &#34;Verification unavailable: runtime integrity check failed&#34;
+                        }
+                    }
+                },
+                onError = { e -&gt;
+                    status.text = when (e) {
+                        is PipeDeniedException -&gt; &#34;Verifier rejected: ${e.reason}&#34;
+                        else -&gt; &#34;Verification unavailable (${e::class.simpleName})&#34;
+                    }
+                },
+            )
+        }
+    }
+}
+</code></pre>
+<p>Three uI-PiPe concepts appear here for the first time:</p>
+<ul>
+<li><strong><code>PipeFullScreen.open(...)</code></strong> — the host&#39;s single entry point. It binds <code>provider</code>, runs the <code>authorizer</code> against the provider&#39;s verified signing identity, and — only on success — hands the provider its window token and calls <code>onSession</code> with a live <code>PipeSession</code>. Any failure along the way (bind failure, timeout, or an <code>authorizer</code> denial) instead calls <code>onError</code> with a <code>PipeException</code> — <strong>no bind and no window are ever created for a rejected caller.</strong></li>
+<li><strong><code>PipeAuthorizers.allowlist(VERIFIER_CERT_SHA256)</code></strong> — the identity gate. Covered in full in the next step.</li>
+<li><strong>Graceful failure handling</strong> — the two <code>lifecycleScope.launch</code> blocks inside <code>onSession</code>, covered in full in the <strong>Typed results + run end-to-end</strong> step below.</li>
+</ul>
+<p>Notice <code>reference</code> and <code>bankName</code> travel two different ways: they go into the <code>PipeRequest</code>&#39;s <code>extras</code> <code>Bundle</code> <em>and</em> the pane opens with them (<code>KycVerifierService.onOpenPane</code> reads them synchronously to build <code>KycPaneView</code> before any message loop exists), while <code>level</code> travels only as the typed <code>KycRequest</code> sent over <code>session.send(...)</code> once the pane is already mounted. That&#39;s not an accident — it&#39;s the two-channel design covered next.</p>
+<h2 is-upgraded>Verify it</h2>
+<pre><code language="language-bash" class="language-bash">./gradlew :sample-kyc-host:assembleDebug
+</code></pre>
+<p>Expected: <code>BUILD SUCCESSFUL</code>. The app won&#39;t successfully open a pane yet — <code>VERIFIER_CERT_SHA256</code> above is VerifyID&#39;s real digest already (this codelab shows you the finished file), but if you&#39;re typing this out yourself with a fresh keystore, yours will differ until the next step.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Pin the trust boundary" duration="4">
+        <p>This is the step that turns &#34;an app can bind an arbitrary service&#34; into &#34;the bank only ever hands its window to the <em>one specific</em> VerifyID binary it trusts.&#34;</p>
+<h2 is-upgraded>Extract VerifyID&#39;s signing-cert SHA-256</h2>
+<p>From the repo root, using the keystore generated in the previous step:</p>
+<pre><code language="language-bash" class="language-bash">keytool -list -v -keystore security/kyc-verifier.keystore -alias verifier -storepass verifierpass \
+  | grep -i &#34;SHA256:&#34; | head -1
+</code></pre>
+<p><code>keytool</code> prints the fingerprint as uppercase hex with colons (<code>AA:BB:CC:...</code>). uI-PiPe&#39;s <code>PipeAuthorizers.allowlist(...)</code> expects <strong>lowercase hex, no colons</strong> — normalize it:</p>
+<pre><code language="language-bash" class="language-bash">keytool -list -v -keystore security/kyc-verifier.keystore -alias verifier -storepass verifierpass \
+  | grep -i &#34;SHA256:&#34; | head -1 | sed &#39;s/.*SHA256: //; s/://g&#39; | tr &#39;A-Z&#39; &#39;a-z&#39;
+</code></pre>
+<p>Expected: a 64-character lowercase hex string, e.g. <code>21027f81c7dacf5c09246d1eb6e61a4ea797ef5a8e198e74721be8739cd3e706</code>.</p>
+<h2 is-upgraded>Wire it into the host</h2>
+<p>In <code>MainActivity.kt</code> (shown in full in the previous step), the constant is:</p>
+<pre><code language="language-kotlin" class="language-kotlin">const val VERIFIER_CERT_SHA256 = &#34;21027f81c7dacf5c09246d1eb6e61a4ea797ef5a8e198e74721be8739cd3e706&#34;
+</code></pre>
+<p>and it feeds <code>PipeAuthorizers.allowlist(...)</code>:</p>
+<pre><code language="language-kotlin" class="language-kotlin">authorizer = PipeAuthorizers.allowlist(VERIFIER_CERT_SHA256),
+</code></pre>
+<p><code>allowlist</code> builds a <code>PipeAuthorizer</code> that only ever sees the <strong>verified </strong><code>PeerIdentity</code> uI-PiPe derived from the kernel/PackageManager — never anything the provider self-reports — and compares its signing-cert digest set against the ones you passed in. If VerifyID&#39;s APK were ever re-signed with a different key (a compromised build, a malicious lookalike app installed under the same package name, anything), the digest would no longer match and <code>open()</code> would deny the bind outright — before any window token is handed over.</p>
+<p>Negative : <strong>This pinning is one-directional in this codelab, and that&#39;s a deliberate teaching choice, not an oversight.</strong> The <em>host</em> pins the <em>verifier</em> here. The reverse — the verifier pinning the host&#39;s signing cert inside its own <code>authorizer()</code> override — is exactly symmetric: it would call <code>PipeAuthorizers.allowlist(bankCertSha256)</code> instead of unconditionally returning <code>AuthDecision.Allow</code>. A production integration would very likely do both directions. This codelab teaches one direction end-to-end rather than doubling every step; see <code>KycVerifierService.authorizer()</code> in the previous step for where the second pin would go.</p>
+<h2 is-upgraded>Prove the pin is load-bearing — negative test</h2>
+<p>Temporarily corrupt one hex character of <code>VERIFIER_CERT_SHA256</code>, reinstall just the host, and retry:</p>
+<pre><code language="language-bash" class="language-bash">./gradlew :sample-kyc-host:installDebug
+adb -s emulator-5554 shell am start -n tech.ssemaj.pipe.kychost/.MainActivity
+</code></pre>
+<p>Tap <strong>Start verification</strong>.</p>
+<p>Expected: the status line reads <code>Verifier rejected: peer signing certs not in allowlist</code> — a <code>PipeDeniedException</code> caught by the <code>onError</code> branch, <code>HOST_POLICY</code> reason. No pane ever appears; no window token was ever handed to the tampered-cert scenario you just simulated.</p>
+<p><strong>Restore the correct digest and reinstall</strong> before moving on:</p>
+<pre><code language="language-kotlin" class="language-kotlin">const val VERIFIER_CERT_SHA256 = &#34;21027f81c7dacf5c09246d1eb6e61a4ea797ef5a8e198e74721be8739cd3e706&#34;
+</code></pre>
+<pre><code language="language-bash" class="language-bash">./gradlew :sample-kyc-host:installDebug
+</code></pre>
+<h2 is-upgraded>Verify it</h2>
+<p>With the correct digest restored, tap <strong>Start verification</strong> again — the VerifyID pane should open normally over Meridian Bank&#39;s window (confirmed fully in the next step).</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Typed results &#43; run end-to-end (dev)" duration="5">
+        <p>Time to install both apps and run the whole flow: bank opens verifier, verifier renders its wizard <em>inside</em> the bank&#39;s window, user completes it, verifier reports back, bank displays the result.</p>
+<p>This step is where the two channels this codelab uses actually meet:</p>
+<ul>
+<li><strong><code>extras</code></strong><strong> at mount time. </strong><code>reference</code> and <code>bankName</code> go into the <code>PipeRequest</code>&#39;s <code>Bundle</code> and are read synchronously by <code>KycVerifierService.onOpenPane</code> <em>before </em><code>KycPaneView</code> exists — there is no message loop yet to send a typed object into, so extras are the only channel available this early.</li>
+<li><strong>Typed </strong><strong><code>KycRequest</code></strong><strong>, host → verifier, after mount.</strong> Once <code>onSession</code> hands back a live <code>PipeSession</code>, the host calls <code>session.send(KycRequest(reference, KycLevel.ENHANCED))</code>. The pane&#39;s <code>KycPaneView.onMessage</code> decodes it with <code>PipeCodec.decodeOrNull<KycRequest>(message)</code> and updates a label on the consent screen — <code>Requested level: ENHANCED</code> — proving the typed message actually reached the pane, not just the service.</li>
+<li><strong>Typed </strong><strong><code>KycResult</code></strong><strong>, verifier → host.</strong> Symmetric to the above: once the user finishes the wizard, <code>KycVerifierService</code> calls <code>host.send(KycResult(...))</code>, and the host&#39;s <code>session.messagesOf<KycResult>().firstOrNull()</code> decodes it back.</li>
+</ul>
+<p><code>extras</code> carries what&#39;s needed to mount the pane at all; the typed messages carry the richer, post-mount conversation in both directions over the same CBOR-over-binder channel.</p>
+<h2 is-upgraded>Install both apps</h2>
+<pre><code language="language-bash" class="language-bash">export JAVA_HOME=/home/joseph/.jdks/temurin-23.0.2
+export PATH=&#34;$HOME/Android/Sdk/platform-tools:$PATH&#34;
+./gradlew :sample-kyc-verifier:installDebug :sample-kyc-host:installDebug
+</code></pre>
+<p>Expected: both installs report <code>Success</code>.</p>
+<p>Positive : Adjust <code>JAVA_HOME</code> to your own JDK 17+ toolchain path — the value above is this codelab&#39;s reference environment, not a requirement.</p>
+<h2 is-upgraded>Run the happy path</h2>
+<pre><code language="language-bash" class="language-bash">adb -s emulator-5554 shell am start -n tech.ssemaj.pipe.kychost/.MainActivity
+</code></pre>
+<p>Tap <strong>Start verification</strong> in Meridian Bank. VerifyID&#39;s pane appears full-screen, drawn <em>inside</em> Meridian Bank&#39;s own window (its process, the bank&#39;s window — that&#39;s the architecture). The consent screen should read <code>Requested level: ENHANCED</code> — the typed <code>KycRequest</code> the host sent right after the session opened. Step through <strong>Continue → Capture → Capture → Done</strong>.</p>
+<p>Expected: the consent screen showed <code>Requested level: ENHANCED</code>, and the bank&#39;s status line reads <code>Verification APPROVED (ref MB-...)</code>, matching the screenshot from the introduction.</p>
+<h2 is-upgraded>Why <code>firstOrNull</code>, not <code>first</code></h2>
+<p>Look again at the result-await coroutine inside <code>onSession</code>:</p>
+<pre><code language="language-kotlin" class="language-kotlin">lifecycleScope.launch {
+    session.send(KycRequest(reference, KycLevel.ENHANCED))
+    val result = session.messagesOf&lt;KycResult&gt;().firstOrNull()
+    if (result != null) {
+        status.text = &#34;Verification ${result.status} (ref ${result.reference})&#34;
+    }
+    // else: session closed before a result (e.g. RASP killed the verifier);
+    // the state-close collector below shows the failure message.
+}
+</code></pre>
+<p>This looks like a defensive-programming nicety. It is load-bearing, and the <strong>Add RASP with hydra</strong> step below shows exactly why: <code>Flow.first()</code> throws <code>NoSuchElementException</code> if the underlying channel closes having emitted nothing — which is precisely what happens if the verifier&#39;s process dies (killed by RASP, a crash, anything) <em>before</em> it calls <code>host.send(...)</code>. An uncaught <code>NoSuchElementException</code> on this <code>lifecycleScope</code> coroutine takes down the entire bank app, not just the pane. <code>firstOrNull()</code> instead completes quietly with <code>null</code>, and the sibling coroutine watching <code>session.state</code> for <code>PipeState.Closed(cause)</code> is left to report the graceful failure message. Both coroutines run independently — one succeeding never protects the app from the other throwing, so each one has to be individually safe.</p>
+<h2 is-upgraded>Verify it</h2>
+<p>Re-run the happy path once more to confirm <code>APPROVED</code> still renders correctly with the <code>firstOrNull</code> change in place — it should look identical to the first run; the change only matters on the failure path exercised in the finale below.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Add RASP with hydra" duration="9">
+        <p>So far the only protection is <em>identity</em> — the bank knows it&#39;s talking to the real VerifyID binary. It says nothing about whether VerifyID&#39;s <strong>runtime</strong> is trustworthy — rooted, running under a debugger, hooked by Frida, or executing inside an emulator pretending to be a real device. That&#39;s what Runtime Application Self-Protection (RASP) is for. This step wires in <a href="https://github.com/ssemaj/hydra" target="_blank">hydra</a> as a zero-code, build-time hardening layer on VerifyID&#39;s <code>guarded</code> build variant.</p>
+<h2 is-upgraded>Add hydra to the version catalog</h2>
+<p><code>gradle/libs.versions.toml</code> — under <code>[versions]</code>:</p>
+<pre><code language="language-toml" class="language-toml">hydra = &#34;2.3.0&#34;
+</code></pre>
+<p>under <code>[plugins]</code>:</p>
+<pre><code language="language-toml" class="language-toml">hydra = { id = &#34;tech.thessemaj.hydra&#34;, version.ref = &#34;hydra&#34; }
+</code></pre>
+<h2 is-upgraded>Declare hydra at the root (apply false)</h2>
+<p>Root <code>build.gradle.kts</code> — hydra is declared but not applied at the root; only the verifier module applies it, and only conditionally:</p>
+<pre><code language="language-kotlin" class="language-kotlin">plugins {
+    alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.kotlin.android) apply false
+    alias(libs.plugins.kotlin.parcelize) apply false
+    alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.binary.compatibility.validator)
+    alias(libs.plugins.hydra) apply false
+}
+</code></pre>
+<h2 is-upgraded>Conditionally apply hydra in the verifier</h2>
+<p>At the top of <code>sample-kyc-verifier/build.gradle.kts</code>, right after the <code>plugins { }</code> block:</p>
+<pre><code language="language-kotlin" class="language-kotlin">// RASP is opt-in: `-Prasp` applies the hydra plugin (lethal, physical-device only). A plain build
+// stays emulator-runnable. Gradle plugins are module-global, so this gates the whole module build.
+val raspEnabled = providers.gradleProperty(&#34;rasp&#34;).isPresent
+if (raspEnabled) apply(plugin = libs.plugins.hydra.get().pluginId)
+</code></pre>
+<p>Gradle plugins apply at the whole-module level, not per build variant — so the codelab&#39;s spec concept of &#34;a <code>dev</code> flavor and a <code>guarded</code> flavor&#34; is implemented here as a Gradle <strong>property toggle</strong> (<code>-Prasp</code>) instead of a product-flavor split. Same intent — one hardened build, one emulator-safe build — via the mechanism Gradle actually offers for conditionally applying a plugin. The <code>applicationId</code> is switched alongside it so both builds can be installed on the same device simultaneously:</p>
+<pre><code language="language-kotlin" class="language-kotlin">    defaultConfig {
+        applicationId = if (raspEnabled) &#34;tech.ssemaj.pipe.kycverifier.guarded&#34; else &#34;tech.ssemaj.pipe.kycverifier&#34;
+        minSdk = 30
+        targetSdk = 36
+        versionCode = 1
+        versionName = &#34;1.0&#34;
+    }
+</code></pre>
+<h2 is-upgraded>The hydra + <code>FAIL_ON_PROJECT_REPOS</code> trap — and the fix</h2>
+<p>Build <code>-Prasp</code> right now, before touching <code>settings.gradle.kts</code> again, and (if your settings file still uses <code>FAIL_ON_PROJECT_REPOS</code>, Gradle&#39;s stricter default) you will hit this:</p>
+<pre><code>Build was configured to prefer settings repositories over project repositories but repository
+&#39;hydraRuntime&#39; was added by build file &#39;sample-kyc-verifier/build.gradle.kts&#39;
+</code></pre>
+<p><strong>Why this happens:</strong> hydra 2.3.0&#39;s Gradle plugin, when applied, injects a <strong>project-level</strong> Maven repository (it calls it <code>hydraRuntime</code>) to serve a vendored runtime AAR it needs at build time. A <code>dependencyResolutionManagement</code> block configured with <code>FAIL_ON_PROJECT_REPOS</code> hard-fails the build the instant <em>any</em> module declares its own repository outside the centralized settings block — which is exactly what hydra&#39;s plugin does on your behalf, invisibly, the moment it&#39;s applied.</p>
+<p><strong>The fix</strong>, already present in this repo&#39;s <code>settings.gradle.kts</code>, has two parts:</p>
+<pre><code language="language-kotlin" class="language-kotlin">dependencyResolutionManagement {
+    // PREFER_SETTINGS (not FAIL_ON_PROJECT_REPOS): hydra&#39;s build-time plugin (applied
+    // conditionally in sample-kyc-verifier under -Prasp) injects a project-level Maven
+    // repo (&#34;hydraRuntime&#34;) to serve its vendored runtime AAR. FAIL_ON_PROJECT_REPOS
+    // hard-errors on that project-level declaration; PREFER_SETTINGS instead ignores it
+    // (warning only) and resolves exclusively from these settings-declared repos — so the
+    // same &#34;hydraRuntime&#34; coordinate is re-declared below, pointed at the build-local m2
+    // dir hydra populates, scoped to its group so it can&#39;t shadow other dependencies.
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        google()
+        mavenCentral()
+        maven(rootDir.resolve(&#34;build/hydra/m2&#34;)) {
+            name = &#34;hydraRuntime&#34;
+            content { includeGroup(&#34;io.ssemaj.rasp&#34;) }
+        }
+    }
+}
+</code></pre>
+<ol type="1">
+<li><strong><code>repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)</code></strong> instead of the stricter <code>FAIL_ON_PROJECT_REPOS</code>. <code>PREFER_SETTINGS</code> downgrades a project-level repository declaration to a warning and resolves dependencies exclusively from the settings-declared repositories instead — so hydra&#39;s injected repo is silently ignored rather than fatal.</li>
+<li><strong>Re-declaring hydra&#39;s runtime repo yourself, in settings</strong>, pointed at the same build-local Maven directory (<code>build/hydra/m2</code>) hydra populates, and <strong>group-scoped</strong> via <code>content { includeGroup("io.ssemaj.rasp") }</code> so it can only ever resolve hydra&#39;s own coordinates — it can&#39;t accidentally shadow or intercept dependency resolution for anything else in the build.</li>
+</ol>
+<p>Without both parts together, you either hard-fail (<code>FAIL_ON_PROJECT_REPOS</code> alone) or silently lose the ability to resolve hydra&#39;s runtime AAR (<code>PREFER_SETTINGS</code> alone, without re-declaring the repo in settings) — you need the mode switch <em>and</em> the settings-side repo declaration.</p>
+<h2 is-upgraded>Build both variants</h2>
+<pre><code language="language-bash" class="language-bash">./gradlew :sample-kyc-verifier:assembleDebug
+</code></pre>
+<p>Expected: <code>BUILD SUCCESSFUL</code>; no hydra tasks in the log; plain <code>tech.ssemaj.pipe.kycverifier</code> APK.</p>
+<pre><code language="language-bash" class="language-bash">./gradlew :sample-kyc-verifier:assembleDebug -Prasp
+</code></pre>
+<p>Expected: <code>BUILD SUCCESSFUL</code>; hydra tasks appear in the log; APK <code>applicationId</code> is <code>tech.ssemaj.pipe.kycverifier.guarded</code>.</p>
+<h2 is-upgraded>Verify it</h2>
+<pre><code language="language-bash" class="language-bash">./gradlew :sample-kyc-verifier:assembleDebug -Prasp
+unzip -p sample-kyc-verifier/build/outputs/apk/debug/sample-kyc-verifier-debug.apk AndroidManifest.xml | grep -a kycverifier.guarded || true
+</code></pre>
+<p>The plain build and the guarded build should now coexist as two separately-installable APKs — confirmed for real below, where the guarded build meets a hostile runtime.</p>
+<h2 is-upgraded>Trip it and recover</h2>
+<p>The payoff: install the <strong>guarded</strong> verifier on an emulator (which hydra treats as a compromised runtime by design), watch it self-terminate, and confirm the bank survives instead of crashing.</p>
+<h2 is-upgraded>Install the guarded verifier on the emulator</h2>
+<pre><code language="language-bash" class="language-bash">export PATH=&#34;$HOME/Android/Sdk/platform-tools:$PATH&#34;
+./gradlew :sample-kyc-verifier:assembleDebug -Prasp
+adb -s emulator-5554 install -r sample-kyc-verifier/build/outputs/apk/debug/sample-kyc-verifier-debug.apk
+</code></pre>
+<h2 is-upgraded>Point the host at the guarded build and watch</h2>
+<p>Temporarily set <code>VERIFIER_PKG = "tech.ssemaj.pipe.kycverifier.guarded"</code> in <code>MainActivity.kt</code> (leave <code>VERIFIER_SVC</code> — the service class name is unchanged) and add the guarded package to the host&#39;s manifest <code><queries></code> alongside the plain one. Reinstall the host, then launch and tap <strong>Start verification</strong> while watching logcat:</p>
+<pre><code language="language-bash" class="language-bash">adb -s emulator-5554 logcat -c
+adb -s emulator-5554 shell am start -n tech.ssemaj.pipe.kychost/.MainActivity
+adb -s emulator-5554 logcat | grep -iE &#34;hydra|kyc|pipe&#34; &amp;
+</code></pre>
+<p>Expected in logcat: the guarded verifier process starts, hydra&#39;s native integrity check runs inside <code>libdicore.so</code>, and the process dies by <code>SIGSEGV</code> within a few hundred milliseconds — for example:</p>
+<pre><code>ActivityManager: Start proc 5770:tech.ssemaj.pipe.kycverifier.guarded/... for service {.../KycVerifierService}
+dicore  : native_integrity: G3/G7 baseline captured libs=349 ...
+libc    : Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x75c in tid 5770 (erifier.guarded)
+</code></pre>
+<p>This is hydra&#39;s emulator detection firing and deliberately terminating the process — <em>before</em><code>KycVerifierService.onOpenPane</code> ever runs, before any KYC UI renders, before any data (mock or otherwise) is touched.</p>
+<h2 is-upgraded>Why the host must use <code>firstOrNull</code>, not <code>first</code>, here</h2>
+<p>This is the exact moment the earlier <strong>Typed results</strong> step&#39;s <code>firstOrNull()</code> choice pays off. When the guarded verifier dies mid-flow, the pane had briefly opened (<code>onSession</code> already fired), so uI-PiPe&#39;s binder-death callback takes the &#34;live pane&#34; teardown path: it sets <code>PipeState.Closed(cause)</code> on <code>session.state</code> and closes the <code>messages</code> channel having sent <strong>zero</strong> typed messages — the verifier was killed before it could call <code>host.send(KycResult(...))</code>.</p>
+<p>With the buggy <code>session.messagesOf<KycResult>().first()</code> (this codelab&#39;s earlier, wrong iteration — do not use it), <code>Flow.first()</code> on a channel that closes empty throws <code>NoSuchElementException</code>. That exception is uncaught on its <code>lifecycleScope</code> coroutine, so it propagates to the process&#39;s default uncaught-exception handler and <strong>crashes the entire bank app</strong> — the system evicts it back to the launcher home screen, and the user never even sees a status message, graceful or otherwise. Meanwhile the <em>sibling</em> coroutine watching for <code>PipeState.Closed(cause)</code> may have already set a perfectly good status string — it doesn&#39;t matter, because the other coroutine&#39;s crash tears down the whole process regardless.</p>
+<p>With <code>firstOrNull()</code> (the version shown throughout this codelab), that same coroutine instead completes quietly with <code>null</code> when the channel closes empty, and does nothing further. The sibling <code>PipeState.Closed(cause)</code> collector is left to do its job uncontested:</p>
+<pre><code language="language-kotlin" class="language-kotlin">lifecycleScope.launch {
+    val closed = session.state.first { it is PipeState.Closed } as PipeState.Closed
+    if (closed.cause != null) {
+        status.text = &#34;Verification unavailable: runtime integrity check failed&#34;
+    }
+}
+</code></pre>
+<p>Expected status text on screen: <code>Verification unavailable: runtime integrity check failed</code> — Meridian Bank&#39;s screen stays intact, the <strong>Start verification</strong> button is re-enabled, and the app process never dies:</p>
+<p class="image-container"><img alt="Meridian Bank showing &amp;ldquo;Verification unavailable: runtime integrity check failed&amp;rdquo; after the guarded verifier was killed by RASP" src="img/a93021afe95112a9.png"></p>
+<p>The lesson generalizes past this one codelab: whenever a typed-message <code>Flow</code> can legitimately close having emitted nothing — a peer process dying is the common case, but a timeout or a provider that simply never replies work the same way — prefer <code>firstOrNull()</code> (or a <code>try</code>/<code>catch</code> around <code>first()</code>) over a bare <code>first()</code>. A <code>Flow</code> that closes empty is not a &#34;should never happen&#34;; on a cross-process channel it&#39;s an ordinary, recoverable outcome.</p>
+<h2 is-upgraded>Clean up</h2>
+<p>Revert <code>VERIFIER_PKG</code> back to <code>"tech.ssemaj.pipe.kycverifier"</code> and remove the temporary guarded <code><queries></code> entry from the host manifest before reinstalling for normal use — the guarded id was only ever meant for this one on-device experiment.</p>
+<pre><code language="language-bash" class="language-bash">./gradlew :sample-kyc-host:installDebug
+</code></pre>
+<h2 is-upgraded>Verify it</h2>
+<p>Re-run the plain happy path from <strong>Typed results + run end-to-end (dev)</strong> once more: it should show <code>Verification APPROVED (ref MB-...)</code> exactly as before, confirming the revert didn&#39;t leave anything broken.</p>
+<h2 is-upgraded>Wrap-up</h2>
+<p>You built two apps that never share code or memory, wired a cryptographic identity gate between them so the bank only ever hands its window to the real VerifyID, and layered a runtime self-protection check on top so a compromised device can&#39;t even get that far. The two failure modes you exercised — <code>PipeDeniedException</code> on a wrong signing cert, and graceful <code>PipeState.Closed(cause)</code> recovery on a RASP-killed peer — are the two shapes of failure any uI-PiPe integration should expect and handle explicitly, rather than letting either one become an uncaught crash.</p>
+<p><strong>Where to go next:</strong></p>
+<ul>
+<li>uI-PiPe main README — <a href="https://github.com/iamjosephmj/uI-PiPe#trust--authorization" target="_blank">Trust &amp; authorization</a>, <a href="https://github.com/iamjosephmj/uI-PiPe#channel-semantics" target="_blank">Channel semantics</a>.</li>
+<li><a href="https://github.com/iamjosephmj/uI-PiPe/blob/main/ARCHITECTURE.md" target="_blank">ARCHITECTURE.md</a> — the full handshake, UID-gated callbacks, and <code>BIND_PANE</code> model.</li>
+<li>File issues or feedback: https://github.com/iamjosephmj/uI-PiPe/issues</li>
+</ul>
+
+
+      </google-codelab-step>
+    
+  </google-codelab>
+
+  <script src="https://storage.googleapis.com/claat-public/native-shim.js"></script>
+  <script src="https://storage.googleapis.com/claat-public/custom-elements.min.js"></script>
+  <script src="https://storage.googleapis.com/claat-public/prettify.js"></script>
+  <script src="https://storage.googleapis.com/claat-public/codelab-elements.js"></script>
+  <script src="//support.google.com/inapp/api.js"></script>
+
+</body>
+</html>
