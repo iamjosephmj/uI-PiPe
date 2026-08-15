@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/Kotlin-Android-5C94FC" alt="Kotlin Android">
 </p>
 
-**Codelab:** [Embed a RASP-guarded KYC verifier](docs/codelab/uipipe-kyc-codelab/) — step-by-step tutorial embedding a signed, RASP-guarded KYC verifier app inside a bank host app. *(Live GitHub Pages hosting for this codelab requires the repo to be public, or on a plan that supports Pages for private repos — this repo is currently private, so browse the generated `index.html` locally for now.)*
+**Codelab:** [Integrate a verified, RASP-guarded KYC provider](docs/codelab/uipipe-kyc-codelab/) — an integrator's guide to embedding a third-party, RASP-guarded KYC provider as a live pane inside your own app with uI-PiPe. *(Live GitHub Pages hosting for this codelab requires the repo to be public, or on a plan that supports Pages for private repos — this repo is currently private, so browse the generated `index.html` locally for now.)*
 
 **One app's live screen, rendered inside another app — across the process boundary, and verified.**
 
