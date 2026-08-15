@@ -8,6 +8,8 @@
   <img src="https://img.shields.io/badge/Kotlin-Android-5C94FC" alt="Kotlin Android">
 </p>
 
+**Codelab:** [Embed a RASP-guarded KYC verifier](docs/codelab/uipipe-kyc-codelab/) — step-by-step tutorial embedding a signed, RASP-guarded KYC verifier app inside a bank host app. *(Live GitHub Pages hosting for this codelab requires the repo to be public, or on a plan that supports Pages for private repos — this repo is currently private, so browse the generated `index.html` locally for now.)*
+
 **One app's live screen, rendered inside another app — across the process boundary, and verified.**
 
 App&nbsp;A (the *host*) hands its window to App&nbsp;B (the *provider*), and App&nbsp;B draws its own real, full-screen UI **right inside App&nbsp;A's window**, from a separate process. On screen it's seamless — nothing tells the user a second app is drawing it. Yet the two apps never share code or memory, and App&nbsp;A only ever lets an App&nbsp;B it has **cryptographically verified** take over its window.
