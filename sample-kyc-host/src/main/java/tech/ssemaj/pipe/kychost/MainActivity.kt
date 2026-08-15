@@ -6,6 +6,7 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import tech.ssemaj.pipe.auth.PipeAuthorizers
 import tech.ssemaj.pipe.core.PipeDeniedException
@@ -50,8 +51,12 @@ class MainActivity : AppCompatActivity() {
                 onSession = { session ->
                     lifecycleScope.launch {
                         session.send(KycRequest(reference, KycLevel.ENHANCED))
-                        val result = session.messagesOf<KycResult>().first()
-                        status.text = "Verification ${result.status} (ref ${result.reference})"
+                        val result = session.messagesOf<KycResult>().firstOrNull()
+                        if (result != null) {
+                            status.text = "Verification ${result.status} (ref ${result.reference})"
+                        }
+                        // else: session closed before a result (e.g. RASP killed the verifier);
+                        // the state-close collector below shows the failure message.
                     }
                     // Graceful teardown: a non-null Closed cause (e.g. RASP killed the verifier) is
                     // an unexpected failure, not a normal close.
