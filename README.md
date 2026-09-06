@@ -12,8 +12,8 @@
 
 App&nbsp;A (the *host*) hands its window to App&nbsp;B (the *provider*), and App&nbsp;B draws its own real, full-screen UI **right inside App&nbsp;A's window**, from a separate process. On screen it's seamless — nothing tells the user a second app is drawing it. Yet the two apps never share code or memory, and App&nbsp;A only ever lets an App&nbsp;B it has **cryptographically verified** take over its window.
 
-<p align="center"><img src="docs/media/demo.gif" width="300" alt="uI-PiPe on a Pixel 6 Pro: the host requests certification, the provider's consent bottom sheet appears inside the host, Approve, then the signed attestation is hardware-verified back in the host"></p>
-<p align="center"><em>Running on a Pixel 6 Pro: host → the provider's consent sheet <b>inside</b> the host → Approve → hardware-verified back in the host.</em></p>
+<p align="center"><img src="docs/media/demo.gif" width="300" alt="uI-PiPe on a Pixel 6 Pro: the host requests certification, the provider's consent dialog appears inside the host, Approve, then the signed attestation is hardware-verified back in the host"></p>
+<p align="center"><em>Running on a Pixel 6 Pro: host → the provider's consent dialog <b>inside</b> the host → Approve → hardware-verified back in the host.</em></p>
 
 > **Two processes. Two of everything the runtime gives you** — two UI threads, two render threads, two heaps and two GCs. A whole second runtime working for you, isolated from yours. *(Isolation, not extra CPU — both runtimes still share the device's cores.)*
 
@@ -27,8 +27,8 @@ Under the hood, App&nbsp;A's activity hands its **window token** to App&nbsp;B, 
 
 The sample apps run a real cross-process certification: the host requests certification, the provider renders a consent pane *in its own process*, signs a challenge nonce with an AndroidKeyStore key, and the host verifies the attestation chain — the pane is the provider's own full-screen window over the host.
 
-<p align="center"><img src="docs/media/in-action.png" width="760" alt="Two Pixel 6 Pro screens: the provider's consent bottom sheet drawn inside the host (host dimmed behind it), and the host showing the signed attestation Hardware-verified"></p>
-<p align="center"><em>On a Pixel 6 Pro — left: the provider's consent sheet, drawn <b>inside</b> the host (dimmed behind it). Right: the signed attestation, hardware-verified back in the host.</em></p>
+<p align="center"><img src="docs/media/in-action.png" width="760" alt="Two Pixel 6 Pro screens: the provider's consent dialog drawn inside the host (host dimmed behind it), and the host showing the signed attestation Hardware-verified"></p>
+<p align="center"><em>On a Pixel 6 Pro — left: the provider's consent dialog, drawn <b>inside</b> the host (dimmed behind it). Right: the signed attestation, hardware-verified back in the host.</em></p>
 
 ## How it works
 
@@ -133,11 +133,11 @@ Nothing else changes: same UID, so the window-token handoff and binder channel j
 
 <p align="center"><img src="docs/media/sample-solo.gif" width="300" alt="The :sample-solo demo on a Pixel 6 Pro: tapping Open renders a pane from the app's own :pane process (host pid ≠ pane pid, same UID, one window), then closes"></p>
 
-The [`:sample-solo`](sample-solo) module demonstrates it — one Activity opening a pane against its own `:pane`-process service. Verified on a Pixel 6 Pro: host pid ≠ pane pid, same UID, one window.
+The [`:sample-solo`](sample-solo) module demonstrates it — one Activity opening a pane against its own `:pane`-process service, with the host/pane pid·tid proof rendered in the pane itself. Verified on a Pixel 6 Pro: host pid ≠ pane pid, same UID, one window.
 
-And it isn't limited to two. A host can open **several panes, each from its own process** — each is a separate child window of the host's window token. Size each pane to a region and mark it non-touch-modal — `PaneSpec(touchModal = false, gravity = …, heightPx = …)` — and they **tile**: every pane is *independently interactive* (touches outside a pane's bounds fall through to the ones behind), each running on its **own UI thread**. `:sample-solo`'s *"Open 3 panes"* spins up host + `:paneA` + `:paneB` + `:paneC` — **four processes, three interactive bands in one host window**. Below, each band was tapped separately (A×1, B×2, C×1) and each shows a distinct kernel thread id — proof of separate processes *and* separate UI threads:
+And it isn't limited to two. A host can open **several panes, each from its own process** — each is a separate child window of the host's window token. Size each pane to a region and mark it non-touch-modal — `PaneSpec(touchModal = false, gravity = …, heightPx = …)` — and they **tile**: every pane is *independently interactive* (touches outside a pane's bounds fall through to the ones behind), each running on its **own UI thread**. `:sample-solo`'s *"Open 3 panes"* spins up host + `:paneA` + `:paneB` + `:paneC` — **four processes, three interactive bands in one host window**. Below, each band was tapped separately (A×1, B×2, C×1); each shows its own kernel thread id, and the host shows the same tap counts — reported live over the channel, cross-process:
 
-<p align="center"><img src="docs/media/sample-solo-multi.png" width="320" alt="Four processes on a Pixel 6 Pro: three interactive provider bands (blue :paneA tid 12988, purple :paneB tid 12990, green :paneC tid 12989), each independently tapped, composited into one host window with the host showing through the gaps"></p>
+<p align="center"><img src="docs/media/sample-solo-multi.png" width="320" alt="Four processes on a Pixel 6 Pro: three interactive provider bands (blue :paneA, violet :paneB, green :paneC), each independently tapped and counting its own taps, composited into one host window that shows the same counts live"></p>
 
 ## Trust & authorization
 
