@@ -21,7 +21,7 @@ App&nbsp;A (the *host*) hands its window to App&nbsp;B (the *provider*), and App
 
 Under the hood, App&nbsp;A's activity hands its **window token** to App&nbsp;B, which adds its `View` as a **real full-screen window** inside App&nbsp;A's own window hierarchy — plus a two-way typed channel between them. App&nbsp;A's jank never stalls it, an App&nbsp;B crash can't take down App&nbsp;A, and neither app's code runs in the other. And because it's a genuine window — not a screenshot, a WebView, or a `RemoteViews` — it's a first-class focus / **soft-keyboard (IME)** / input target on every supported API, with no `SurfaceControlViewHost` and no `@hide` APIs.
 
-**Status:** latest release (`1.0.0-alpha03`). Android 9+ (`minSdk 28`). Targets a closed app family / vetted partners, not an open marketplace. Deep dive: **[ARCHITECTURE.md](ARCHITECTURE.md)**.
+**Status:** latest release (`1.0.0-alpha04`). Android 9+ (`minSdk 28`). Targets a closed app family / vetted partners, not an open marketplace. Deep dive: **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 ## See it in action
 
@@ -62,8 +62,8 @@ dependencyResolutionManagement {
 Then the dependency:
 
 ```kotlin
-implementation("com.github.iamjosephmj.uI-PiPe:pipe:1.0.0-alpha03")
-implementation("com.github.iamjosephmj.uI-PiPe:pipe-serialization:1.0.0-alpha03") // optional: typed messages
+implementation("com.github.iamjosephmj.uI-PiPe:pipe:1.0.0-alpha04")
+implementation("com.github.iamjosephmj.uI-PiPe:pipe-serialization:1.0.0-alpha04") // optional: typed messages
 ```
 
 ## Documentation

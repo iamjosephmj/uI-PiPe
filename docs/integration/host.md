@@ -30,8 +30,8 @@ dependencyResolutionManagement {
 
 ```kotlin
 // build.gradle.kts (your app module)
-implementation("com.github.iamjosephmj.uI-PiPe:pipe:1.0.0-alpha03")
-implementation("com.github.iamjosephmj.uI-PiPe:pipe-serialization:1.0.0-alpha03") // optional: typed messages
+implementation("com.github.iamjosephmj.uI-PiPe:pipe:1.0.0-alpha04")
+implementation("com.github.iamjosephmj.uI-PiPe:pipe-serialization:1.0.0-alpha04") // optional: typed messages
 ```
 
 ## 2. Declare visibility

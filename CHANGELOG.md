@@ -6,6 +6,8 @@ versioning: [SemVer](https://semver.org/) — pre-1.0, so breaking changes are p
 
 ## [Unreleased]
 
+## [1.0.0-alpha04] — 2026-09-06
+
 ### Changed
 
 - **`minSdk` lowered from 30 (Android 11) to 28 (Android 9/Pie).** The cross-process sub-window
@@ -14,6 +16,13 @@ versioning: [SemVer](https://semver.org/) — pre-1.0, so breaking changes are p
   Verified end-to-end on an API 28 emulator — the full instrumented certification suite (render,
   input into the pane, both-direction messaging, teardown, adversarial denials) plus the solo
   tiling demo — alongside the existing API 30 and API 36 verifications.
+
+### Docs & samples (since alpha03)
+
+- README screenshots and GIFs re-captured from the redesigned samples (consent dialog, solo
+  isolation dialog, tiling bands with live cross-process tap counters).
+- `:sample-solo` ships an installable, minified release APK as a release asset
+  (debug-signed demo artifact, 1.7 MB).
 
 ## [1.0.0-alpha03] — 2026-09-06
 
@@ -85,6 +94,7 @@ First public alpha of the two-process pane architecture.
 - Hardware key-attestation sample round-trip (`:sample-host` / `:sample-provider`) and
   adversarial test apps (`:evil-host`, `:evil-provider`).
 
-[Unreleased]: https://github.com/iamjosephmj/uI-PiPe/compare/1.0.0-alpha03...HEAD
+[Unreleased]: https://github.com/iamjosephmj/uI-PiPe/compare/1.0.0-alpha04...HEAD
+[1.0.0-alpha04]: https://github.com/iamjosephmj/uI-PiPe/compare/1.0.0-alpha03...1.0.0-alpha04
 [1.0.0-alpha03]: https://github.com/iamjosephmj/uI-PiPe/compare/1.0.0-alpha02...1.0.0-alpha03
 [1.0.0-alpha02]: https://github.com/iamjosephmj/uI-PiPe/releases/tag/1.0.0-alpha02

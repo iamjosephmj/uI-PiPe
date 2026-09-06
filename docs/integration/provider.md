@@ -21,8 +21,8 @@ Sections 1–4 are the required path; the rest is shaping the pane and hardening
 Same as the [host](host.md#1-add-the-dependency): JitPack repository, then
 
 ```kotlin
-implementation("com.github.iamjosephmj.uI-PiPe:pipe:1.0.0-alpha03")
-implementation("com.github.iamjosephmj.uI-PiPe:pipe-serialization:1.0.0-alpha03") // optional: typed messages
+implementation("com.github.iamjosephmj.uI-PiPe:pipe:1.0.0-alpha04")
+implementation("com.github.iamjosephmj.uI-PiPe:pipe-serialization:1.0.0-alpha04") // optional: typed messages
 ```
 
 ## 2. Declare the service
