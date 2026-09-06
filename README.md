@@ -8,9 +8,11 @@
   <img src="https://img.shields.io/badge/Kotlin-Android-5C94FC" alt="Kotlin Android">
 </p>
 
-**One app's live screen, rendered inside another app — across the process boundary, and verified.**
+**More processes rendering inside your app — more main threads. Verified before they draw.**
 
 App&nbsp;A (the *host*) hands its window to App&nbsp;B (the *provider*), and App&nbsp;B draws its own real, full-screen UI **right inside App&nbsp;A's window**, from a separate process. On screen it's seamless — nothing tells the user a second app is drawing it. Yet the two apps never share code or memory, and App&nbsp;A only ever lets an App&nbsp;B it has **cryptographically verified** take over its window.
+
+That's the whole point: Android gives you **one** main thread per process — so a heavyweight vendor SDK (face verification / liveness, KYC capture, ad rendering) normally animates on *your* main thread and janks *your* app. Hand its UI a pane and it renders in **its** process, on **its** main thread, over **its** heap — your app's frame pacing never feels it.
 
 <p align="center"><img src="docs/media/demo.gif" width="300" alt="uI-PiPe on a Pixel 6 Pro: the host requests certification, the provider's consent dialog appears inside the host, Approve, then the signed attestation is hardware-verified back in the host"></p>
 <p align="center"><em>Running on a Pixel 6 Pro: host → the provider's consent dialog <b>inside</b> the host → Approve → hardware-verified back in the host.</em></p>
@@ -38,7 +40,7 @@ Every open is a mutual, cryptographically-gated handshake — identity is kernel
 
 ## Use cases
 
-- **Third-party / SDK UI you don't want in your process** — a vendor ships a screen you render in *their* process; their crash, jank, or memory can't touch your app, and their code never runs in yours.
+- **Heavy third-party / vendor SDK UI (face verification, liveness, KYC, ads)** — the SDK ships a screen you render in *its* process, on *its* main thread; its frame drops, GC pauses, and crashes can't touch your app, and its code never runs in yours.
 - **Super-app mini-apps & plugins** — host a partner's screen inside your app, locked to their exact signing key.
 - **Verified partner flows** — payment, identity, consent, or attestation UIs where the host must *prove who is drawing* before it hands over the screen.
 - **On-device consent with hardware attestation** — exactly the sample: the provider signs a challenge with an AndroidKeyStore key, the host verifies the chain.
