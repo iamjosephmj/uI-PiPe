@@ -29,16 +29,16 @@ class PipeAuthorizerTest {
         assertEquals(AuthDecision.Allow, AllowlistAuthorizer(setOf(CERT_B)).authorize(peer(CERT_B), request))
     }
     @Test fun anyOfAllowsWhenAnyAllows() = runTest {
-        val a = anyOf(AllowlistAuthorizer(setOf(CERT_B)), SameSigningKeyAuthorizer(setOf(CERT_A)))
+        val a = PipeAuthorizers.anyOf(AllowlistAuthorizer(setOf(CERT_B)), SameSigningKeyAuthorizer(setOf(CERT_A)))
         assertEquals(AuthDecision.Allow, a.authorize(peer(CERT_A), request))
     }
     @Test fun anyOfJoinsDenyReasons() = runTest {
-        val a = anyOf(PipeAuthorizer { _, _ -> AuthDecision.Deny("first") },
+        val a = PipeAuthorizers.anyOf(PipeAuthorizer { _, _ -> AuthDecision.Deny("first") },
                       PipeAuthorizer { _, _ -> AuthDecision.Deny("second") })
         assertEquals(AuthDecision.Deny("first; second"), a.authorize(peer(CERT_A), request))
     }
     @Test fun anyOfEmptyDenies() = runTest {
-        assertTrue(anyOf().authorize(peer(CERT_A), request) is AuthDecision.Deny)
+        assertTrue(PipeAuthorizers.anyOf().authorize(peer(CERT_A), request) is AuthDecision.Deny)
     }
     @Test fun suspendingPolicyCanDeny() = runTest {
         val a = PipeAuthorizer { _, _ -> kotlinx.coroutines.yield(); AuthDecision.Deny("async") }

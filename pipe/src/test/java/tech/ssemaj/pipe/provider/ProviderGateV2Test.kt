@@ -1,23 +1,26 @@
 package tech.ssemaj.pipe.provider
 
+import android.content.ComponentName
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import tech.ssemaj.pipe.auth.AuthDecision
 import tech.ssemaj.pipe.auth.IdentityResolver
+import tech.ssemaj.pipe.auth.PackageManagerSource
 import tech.ssemaj.pipe.auth.PipeAuthorizer
-import tech.ssemaj.pipe.auth.SigningSource
+import tech.ssemaj.pipe.core.GateResult
 import tech.ssemaj.pipe.core.PipeRequest
 import tech.ssemaj.pipe.transport.Protocol
 
 private class FakeSource(
     private val pkgs: Map<Int, List<String>> = mapOf(10001 to listOf("com.host")),
     private val certs: Map<String, List<String>> = mapOf("com.host" to listOf("aa11")),
-) : SigningSource {
+) : PackageManagerSource {
     override fun packagesForUid(uid: Int) = pkgs[uid] ?: emptyList()
     override fun certLineageSha256(packageName: String) = certs[packageName] ?: emptyList()
     override fun uidForPackage(packageName: String) = pkgs.entries.firstOrNull { packageName in it.value }?.key ?: -1
+    override fun serviceResolvable(component: ComponentName) = true
 }
 private val allow = PipeAuthorizer { _, _ -> AuthDecision.Allow }
 private val deny = PipeAuthorizer { _, _ -> AuthDecision.Deny("nope") }

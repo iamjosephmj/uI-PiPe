@@ -31,4 +31,16 @@ data class PaneSpec(
     val gravity: Int = Gravity.TOP or Gravity.START,
     val widthPx: Int = WindowManager.LayoutParams.MATCH_PARENT,
     val heightPx: Int = WindowManager.LayoutParams.MATCH_PARENT,
+    /**
+     * Full-bleed pane: **no automatic insets padding** on the pane root, so a scrim covers the
+     * pane's whole window edge-to-edge. With the default `false` the pane content is inset to the
+     * system bars. When `true`, handle insets yourself in the content (in Compose:
+     * `Modifier.windowInsetsPadding(WindowInsets.safeDrawing)` on the actual card, *after* the
+     * full-bleed scrim).
+     *
+     * Note: a pane is a sub-window of the host and therefore cannot itself draw over the status
+     * and navigation bar strips — pair this with the host-side
+     * `PipeFullScreen.open(dimSystemBars = true)` to dim those strips to match the scrim.
+     */
+    val edgeToEdge: Boolean = false,
 )

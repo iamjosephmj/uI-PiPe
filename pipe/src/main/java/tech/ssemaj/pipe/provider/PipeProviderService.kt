@@ -16,13 +16,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import tech.ssemaj.pipe.auth.AndroidSigningSource
+import tech.ssemaj.pipe.auth.AndroidPackageManagerSource
 import tech.ssemaj.pipe.auth.IdentityResolver
 import tech.ssemaj.pipe.auth.PeerIdentity
 import tech.ssemaj.pipe.auth.PipeAuthorizer
 import tech.ssemaj.pipe.auth.PipeAuthorizers
 import tech.ssemaj.pipe.channel.OutboundSequencer
 import tech.ssemaj.pipe.core.CloseReason
+import tech.ssemaj.pipe.core.GateResult
 import tech.ssemaj.pipe.core.PipeMessage
 import tech.ssemaj.pipe.core.PipeRequest
 import tech.ssemaj.pipe.internal.ignoringRemote
@@ -72,7 +73,7 @@ abstract class PipeProviderService : Service() {
             // Must be read on the binder thread, before any dispatch/coroutine hop —
             // Binder.getCallingUid() only reflects the caller inside the transaction.
             val callingUid = Binder.getCallingUid()
-            val gate = ProviderGate(IdentityResolver(AndroidSigningSource(this@PipeProviderService)), authorizer())
+            val gate = ProviderGate(IdentityResolver(AndroidPackageManagerSource(this@PipeProviderService)), authorizer())
             paneScope.launch {
                 when (val result = gate.admit(callingUid, spec.request, spec.protocolVersion)) {
                     is GateResult.Refused -> ignoringRemote { callback.onDenied(result.reason) }
@@ -97,7 +98,7 @@ abstract class PipeProviderService : Service() {
                 is PaneResult.Content -> mountPane(spec, result, hostChannel, host, callback)
             }
         } catch (t: Throwable) {
-            ignoringRemote { callback.onError("provider failed to open pane: ${t.message}") }
+            ignoringRemote { callback.onError("provider failed to open pane: ${t.message ?: t.javaClass.simpleName}") }
         }
     }
 
@@ -113,7 +114,7 @@ abstract class PipeProviderService : Service() {
         val hostBinder = hostChannel.asBinder()
         // Fill a full-screen (MATCH) window; wrap a sized (region) window to its content.
         fun fit(v: Int) = if (v == WindowManager.LayoutParams.MATCH_PARENT) v else FrameLayout.LayoutParams.WRAP_CONTENT
-        val root = PaneRoot(this).apply {
+        val root = PaneRoot(this, fitSystemBars = !result.spec.edgeToEdge).apply {
             addView(content.view, FrameLayout.LayoutParams(fit(result.spec.widthPx), fit(result.spec.heightPx)))
         }
         val windowManager = getSystemService(WindowManager::class.java)

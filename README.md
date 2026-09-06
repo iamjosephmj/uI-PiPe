@@ -8,8 +8,6 @@
   <img src="https://img.shields.io/badge/Kotlin-Android-5C94FC" alt="Kotlin Android">
 </p>
 
-**Codelab:** [Integrate a verified, RASP-guarded KYC provider](docs/codelab/uipipe-kyc-codelab/) — an integrator's guide to embedding a third-party, RASP-guarded KYC provider as a live pane inside your own app with uI-PiPe. *(Live GitHub Pages hosting for this codelab requires the repo to be public, or on a plan that supports Pages for private repos — this repo is currently private, so browse the generated `index.html` locally for now.)*
-
 **One app's live screen, rendered inside another app — across the process boundary, and verified.**
 
 App&nbsp;A (the *host*) hands its window to App&nbsp;B (the *provider*), and App&nbsp;B draws its own real, full-screen UI **right inside App&nbsp;A's window**, from a separate process. On screen it's seamless — nothing tells the user a second app is drawing it. Yet the two apps never share code or memory, and App&nbsp;A only ever lets an App&nbsp;B it has **cryptographically verified** take over its window.
@@ -23,7 +21,7 @@ App&nbsp;A (the *host*) hands its window to App&nbsp;B (the *provider*), and App
 
 Under the hood, App&nbsp;A's activity hands its **window token** to App&nbsp;B, which adds its `View` as a **real full-screen window** inside App&nbsp;A's own window hierarchy — plus a two-way typed channel between them. App&nbsp;A's jank never stalls it, an App&nbsp;B crash can't take down App&nbsp;A, and neither app's code runs in the other. And because it's a genuine window — not a screenshot, a WebView, or a `RemoteViews` — it's a first-class focus / **soft-keyboard (IME)** / input target on every supported API, with no `SurfaceControlViewHost` and no `@hide` APIs.
 
-**Status:** latest release (`1.0.0-alpha02`). Android 11+ (`minSdk 30`). Targets a closed app family / vetted partners, not an open marketplace. Deep dive: **[ARCHITECTURE.md](ARCHITECTURE.md)**.
+**Status:** latest release (`1.0.0-alpha03`). Android 11+ (`minSdk 30`). Targets a closed app family / vetted partners, not an open marketplace. Deep dive: **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 ## See it in action
 
@@ -64,9 +62,18 @@ dependencyResolutionManagement {
 Then the dependency:
 
 ```kotlin
-implementation("com.github.iamjosephmj.uI-PiPe:pipe:1.0.0-alpha02")
-implementation("com.github.iamjosephmj.uI-PiPe:pipe-serialization:1.0.0-alpha02") // optional: typed messages
+implementation("com.github.iamjosephmj.uI-PiPe:pipe:1.0.0-alpha03")
+implementation("com.github.iamjosephmj.uI-PiPe:pipe-serialization:1.0.0-alpha03") // optional: typed messages
 ```
+
+## Documentation
+
+| Doc | What it's for |
+|---|---|
+| **[Integration guides](docs/integration/README.md)** | Host, provider, messaging, security, and troubleshooting — the integrator's path from zero to a verified pane. |
+| **[ARCHITECTURE.md](ARCHITECTURE.md)** | How it works: wire protocol, gates, window mechanics, teardown. |
+| **[CHANGELOG.md](CHANGELOG.md)** | Release history and migration notes. |
+| API reference | Generate locally: `./gradlew :dokkaGeneratePublicationHtml` → `build/dokka/html/index.html`. |
 
 ## Host
 
@@ -82,11 +89,11 @@ PipeFullScreen.open(
         lifecycleScope.launch { session.messages.collect { /* provider → host */ } }
         lifecycleScope.launch { session.send(PipeMessage(bundleOf("text" to "hello"))) } // host → provider
     },
-    onError = { e -> /* PipeDeniedException (refused) | timeout | transport | died */ },
+    onError = { e -> /* sealed PipeException: denied | unavailable | timeout | version skew | transport */ },
 )
 ```
 
-`open()` binds and verifies the provider, then delivers a live `PipeSession` to `onSession` (or a `PipeException` to `onError`). The pane tears down on `session.close()`, back-press, or activity destroy — whichever comes first. Declare providers you bind in `<queries>`.
+`open()` binds and verifies the provider, then delivers a live `PipeSession` to `onSession` (or a `PipeException` to `onError`). The pane tears down on `session.close()`, back-press, or activity destroy — whichever comes first. Declare providers you bind in `<queries>`. Full walkthrough with error handling, discovery, timeouts, and testing: **[Host guide](docs/integration/host.md)**.
 
 ## Provider
 
@@ -139,12 +146,12 @@ A `PipeAuthorizer` only ever sees the verified `PeerIdentity` the library built 
 ```kotlin
 fun interface PipeAuthorizer { suspend fun authorize(peer: PeerIdentity, request: PipeRequest): AuthDecision }
 
-PipeAuthorizers.sameSigningKey(context)          // only your own signing key (default)
-PipeAuthorizers.allowlist("aa11…", "bb22…")      // specific partner signing certs (SHA-256)
-anyOf(sameSigningKey(context), allowlist(cert))  // compose
+PipeAuthorizers.sameSigningKey(context)                  // only your own signing key (default)
+PipeAuthorizers.allowlist("aa11…", "bb22…")              // specific partner signing certs (SHA-256)
+PipeAuthorizers.anyOf(sameSigningKey(ctx), allowlist(c)) // compose
 ```
 
-`authorize` is `suspend`, so a policy may call a backend or prompt for consent. Get a partner's cert hash with `apksigner verify --print-certs app.apk`. A host only ever hands its window token to a provider it has cryptographically verified — that gate is what keeps a full-screen provider window safe. Full model (UID-gated callbacks, shared-UID semantics, `BIND_PANE`): [ARCHITECTURE.md §7 & §12](ARCHITECTURE.md).
+`authorize` is `suspend`, so a policy may call a backend or prompt for consent. Get a partner's cert hash with `apksigner verify --print-certs app.apk`. A host only ever hands its window token to a provider it has cryptographically verified — that gate is what keeps a full-screen provider window safe. Full model (UID-gated callbacks, shared-UID semantics): [ARCHITECTURE.md §7 & §12](ARCHITECTURE.md); integrator-facing guide: [Security & trust](docs/integration/security.md).
 
 ## Typed messaging
 

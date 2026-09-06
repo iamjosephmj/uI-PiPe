@@ -1,24 +1,18 @@
-package tech.ssemaj.pipe.samplehost.presentation.ui
+package tech.ssemaj.pipe.samplesolo
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
-private val Teal = Color(0xFF00696D)
-
-/** Branded fallback (API < 31): one teal seed, tuned to the provider pane's sheet accent. */
+/** Teal-branded fallback matching the flagship samples' design language. */
 private val LightScheme = lightColorScheme(
-    primary = Teal,
+    primary = Color(0xFF00696D),
     onPrimary = Color.White,
     primaryContainer = Color(0xFF9CF2EF),
     onPrimaryContainer = Color(0xFF002021),
@@ -28,12 +22,6 @@ private val LightScheme = lightColorScheme(
     onSecondaryContainer = Color(0xFF051F21),
     tertiary = Color(0xFF4C5F7C),
     onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFD4E3FF),
-    onTertiaryContainer = Color(0xFF041C35),
-    error = Color(0xFFBA1A1A),
-    onError = Color.White,
-    errorContainer = Color(0xFFFFDAD6),
-    onErrorContainer = Color(0xFF410002),
     background = Color(0xFFF9FAF8),
     onBackground = Color(0xFF191C1C),
     surface = Color(0xFFF9FAF8),
@@ -41,6 +29,8 @@ private val LightScheme = lightColorScheme(
     surfaceVariant = Color(0xFFDAE4E5),
     onSurfaceVariant = Color(0xFF3F4949),
     outline = Color(0xFF6F797A),
+    error = Color(0xFFBA1A1A),
+    onError = Color.White,
 )
 
 private val DarkScheme = darkColorScheme(
@@ -50,16 +40,8 @@ private val DarkScheme = darkColorScheme(
     onPrimaryContainer = Color(0xFF9CF2EF),
     secondary = Color(0xFFB0CBCB),
     onSecondary = Color(0xFF1C3536),
-    secondaryContainer = Color(0xFF334B4C),
-    onSecondaryContainer = Color(0xFFCCE8E9),
     tertiary = Color(0xFFB3C8E8),
     onTertiary = Color(0xFF1D314B),
-    tertiaryContainer = Color(0xFF354863),
-    onTertiaryContainer = Color(0xFFD4E3FF),
-    error = Color(0xFFFFB4AB),
-    onError = Color(0xFF690005),
-    errorContainer = Color(0xFF93000A),
-    onErrorContainer = Color(0xFFFFDAD6),
     background = Color(0xFF191C1C),
     onBackground = Color(0xFFE0E3E2),
     surface = Color(0xFF191C1C),
@@ -67,10 +49,11 @@ private val DarkScheme = darkColorScheme(
     surfaceVariant = Color(0xFF3F4949),
     onSurfaceVariant = Color(0xFFBEC8C9),
     outline = Color(0xFF889393),
+    error = Color(0xFFFFB4AB),
+    onError = Color(0xFF690005),
 )
 
-/** Softer, larger corners than stock M3 — the demo's friendly-but-precise character. */
-private val PipeShapes = Shapes(
+private val SoloShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
     small = RoundedCornerShape(12.dp),
     medium = RoundedCornerShape(16.dp),
@@ -79,15 +62,10 @@ private val PipeShapes = Shapes(
 )
 
 @Composable
-fun PipeDemoTheme(content: @Composable () -> Unit) {
-    val dark = isSystemInDarkTheme()
-    val colorScheme = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        dark -> DarkScheme
-        else -> LightScheme
-    }
-    MaterialTheme(colorScheme = colorScheme, shapes = PipeShapes, content = content)
+fun SoloTheme(content: @Composable () -> Unit) {
+    MaterialTheme(
+        colorScheme = if (isSystemInDarkTheme()) DarkScheme else LightScheme,
+        shapes = SoloShapes,
+        content = content,
+    )
 }

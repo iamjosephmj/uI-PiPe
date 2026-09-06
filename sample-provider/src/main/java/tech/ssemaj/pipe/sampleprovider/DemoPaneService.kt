@@ -9,23 +9,24 @@ import tech.ssemaj.pipe.core.PipeMessage
 import tech.ssemaj.pipe.core.PipeRequest
 import tech.ssemaj.pipe.provider.HostHandle
 import tech.ssemaj.pipe.provider.PaneResult
+import tech.ssemaj.pipe.provider.PaneSpec
 import tech.ssemaj.pipe.provider.PipeContent
 import tech.ssemaj.pipe.provider.PipeProviderService
 import tech.ssemaj.pipe.samples.contract.CertificationRequest
 import tech.ssemaj.pipe.samples.contract.CertificationResponse
 import tech.ssemaj.pipe.sampleprovider.data.KeystoreRepository
 import tech.ssemaj.pipe.sampleprovider.domain.IssueCertificationUseCase
-import tech.ssemaj.pipe.sampleprovider.pane.ConsentSheet
+import tech.ssemaj.pipe.sampleprovider.pane.ConsentDialog
 import tech.ssemaj.pipe.sampleprovider.pane.PanePresenter
 import tech.ssemaj.pipe.serialization.PipeCodec
 import tech.ssemaj.pipe.serialization.send
 
 /**
- * Sample provider: renders the consent flow as a **Compose bottom sheet drawn inside the pane**.
+ * Sample provider: renders the consent flow as a **Compose dialog drawn inside the pane**.
  *
  * The pane is the library's default — a full-screen transparent window — and everything the user
- * sees (scrim, bottom-anchored card, buttons, dismiss) is composed here in [ConsentSheet]; the
- * library knows nothing about "sheet". `ComposeView` works with nothing extra because the pane's
+ * sees (scrim, centered card, buttons, dismiss) is composed here in [ConsentDialog]; the
+ * library knows nothing about "dialog". `ComposeView` works with nothing extra because the pane's
  * `PaneRoot` is a lifecycle/saved-state/viewmodel owner, so a Compose pane just drops in.
  */
 class DemoPaneService : PipeProviderService() {
@@ -39,7 +40,7 @@ class DemoPaneService : PipeProviderService() {
         val composeView = ComposeView(this).apply {
             setContent {
                 val state by presenter.state.collectAsState()
-                ConsentSheet(
+                ConsentDialog(
                     state = state,
                     onApprove = {
                         (presenter.state.value as? PanePresenter.State.Consent)?.let { consent ->
@@ -72,7 +73,12 @@ class DemoPaneService : PipeProviderService() {
                 }
             }
         }
-        // Full-screen transparent pane (the default). The dialog animates itself in (see ConsentDialog).
-        return PaneResult.Content(content)
+        // Full-screen transparent pane, edge-to-edge so the scrim dims the whole screen (status
+        // bar included); the dialog card applies safe-drawing insets itself. The dialog animates
+        // itself in (see ConsentDialog).
+        return PaneResult.Content(
+            content,
+            PaneSpec(edgeToEdge = true),
+        )
     }
 }

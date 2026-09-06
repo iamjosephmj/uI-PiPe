@@ -55,16 +55,19 @@ If you add, remove, or change anything public in `:pipe`, regenerate the API dum
 git add pipe/api/pipe.api
 ```
 
-CI runs `:pipe:apiCheck` and will fail if `pipe/api/pipe.api` doesn't match the code.
+CI runs `:pipe:apiCheck` and will fail if `pipe.api` doesn't match the code. Also add a
+[CHANGELOG.md](CHANGELOG.md) entry under **Unreleased** — breaking changes must be listed even
+pre-1.0.
 
-### Regenerating the KYC codelab
+### Docs
 
-The codelab source is `docs/codelab/kyc.md`. Regenerate the static site with
-[claat](https://github.com/googlecodelabs/tools):
+- Integrator-facing docs live in `docs/integration/` (guides).
+- KDoc on public declarations is the API reference — explain the non-obvious *why*, not the
+  signature. Generate and browse it with:
 
-    claat export -o docs/codelab docs/codelab/kyc.md
-
-Commit the regenerated `docs/codelab/<id>/` output alongside the source.
+```bash
+./gradlew :dokkaGeneratePublicationHtml   # → build/dokka/html/index.html
+```
 
 ## Project layout
 
@@ -73,10 +76,8 @@ Commit the regenerated `docs/codelab/<id>/` output alongside the source.
 :pipe-serialization   Optional typed (CBOR) messaging over the raw PipeMessage envelope.
 :sample-contract      Shared @Serializable message contract for the samples.
 :sample-host / :sample-provider   The demo: a verified hardware-attestation consent flow.
+:sample-solo          One app, N processes: in-app isolation + three-pane tiling demo.
 :evil-host / :evil-provider       Differently-signed adversarial apps that assert denial in both directions.
-:sample-kyc-contract  Shared @Serializable KYC wire types for the codelab.
-:sample-kyc-host      "Meridian Bank" — codelab host app.
-:sample-kyc-verifier  "VerifyID" — codelab KYC provider (RASP-guarded via -Prasp).
 ```
 
 Deep dive: **[ARCHITECTURE.md](ARCHITECTURE.md)**.

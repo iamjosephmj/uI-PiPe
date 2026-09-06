@@ -5,11 +5,15 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import tech.ssemaj.pipe.auth.AndroidSigningSource
+import tech.ssemaj.pipe.auth.AndroidPackageManagerSource
 import tech.ssemaj.pipe.core.Pipe
 import tech.ssemaj.pipe.host.ProviderComponent
 
-/** A provider resolved by intent action, with its component, label, and signing cert lineage. */
+/**
+ * A provider resolved by intent action: everything a host needs to render a picker and later open
+ * the pane. [certSha256] is the provider's full signing lineage — pin it (e.g. via
+ * [PipeAuthorizers.allowlist][tech.ssemaj.pipe.auth.PipeAuthorizers.allowlist]) before trusting it.
+ */
 data class ProviderDescriptor(
     val component: ProviderComponent,
     val packageName: String,
@@ -37,12 +41,23 @@ internal fun buildDescriptors(
     )
 }
 
-/** Resolves installed Pipe providers by intent action, so hosts don't hardcode provider components. */
+/**
+ * Finds installed Pipe providers by their `OPEN_PANE` intent action, so hosts don't have to
+ * hardcode provider components.
+ *
+ * Requires the discovered packages to be *visible* to your app (API 30+): declare a `<queries>`
+ * element with the provider's package — or with the
+ * [action][Pipe.ACTION_OPEN_PANE] — in your manifest. Invisible providers are simply not returned.
+ */
 object PipeDiscovery {
+    /**
+     * All installed providers answering [action] (default: the Pipe open action), with labels and
+     * signing-cert lineages. Runs on `Dispatchers.IO`; safe to call from any dispatcher.
+     */
     suspend fun query(context: Context, action: String = Pipe.ACTION_OPEN_PANE): List<ProviderDescriptor> =
         withContext(Dispatchers.IO) {
             val pm = context.applicationContext.packageManager
-            val signingSource = AndroidSigningSource(context)
+            val signingSource = AndroidPackageManagerSource(context)
             val raw = pm.queryIntentServices(Intent(action), PackageManager.ResolveInfoFlags.of(0))
                 .mapNotNull { resolveInfo ->
                     resolveInfo.serviceInfo?.let { serviceInfo ->

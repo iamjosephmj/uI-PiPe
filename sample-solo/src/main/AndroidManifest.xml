@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="uI-PiPe Solo (2 processes)"
-        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+        android:label="uI-PiPe Solo"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

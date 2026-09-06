@@ -22,7 +22,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Binary-compatibility check + unit tests + build
+      - name: Binary-compatibility check + unit tests + docs + build
         run: >
           ./gradlew --no-daemon --stacktrace
           :pipe:apiCheck
@@ -31,9 +31,7 @@ jobs:
           :sample-host:testDebugUnitTest
           :sample-provider:testDebugUnitTest
           :sample-solo:assembleDebug
-          :sample-kyc-contract:test
-          :sample-kyc-host:assembleDebug
-          :sample-kyc-verifier:assembleDebug
+          :dokkaGeneratePublicationHtml
 
       - name: Upload test reports
         if: always()
@@ -41,4 +39,11 @@ jobs:
         with:
           name: test-reports
           path: '**/build/reports/tests/'
+          if-no-files-found: ignore
+
+      - name: Upload API reference
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-reference
+          path: build/dokka/html/
           if-no-files-found: ignore

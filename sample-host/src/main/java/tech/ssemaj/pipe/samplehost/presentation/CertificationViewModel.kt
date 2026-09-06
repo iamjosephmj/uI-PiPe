@@ -46,6 +46,8 @@ class CertificationViewModel(
             provider = provider,
             request = PipeRequest(ACTION_CERTIFICATION),
             authorizer = authorizer,
+            // The provider's pane is a full-bleed scrim dialog — dim the host's bar strips to match.
+            dimSystemBars = true,
             onSession = { session ->
                 container.sessionRepository.set(session)
                 viewModelScope.launch { runFlow(session) }

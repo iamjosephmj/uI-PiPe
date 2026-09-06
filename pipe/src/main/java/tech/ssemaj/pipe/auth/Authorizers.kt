@@ -3,7 +3,7 @@ package tech.ssemaj.pipe.auth
 import tech.ssemaj.pipe.core.PipeRequest
 
 /** Allows peers whose signing lineage intersects the local app's signing certs. */
-class SameSigningKeyAuthorizer(localCertsSha256: Set<String>) : PipeAuthorizer {
+internal class SameSigningKeyAuthorizer(localCertsSha256: Set<String>) : PipeAuthorizer {
     private val local = localCertsSha256.map { it.lowercase() }.toSet()
     override suspend fun authorize(peer: PeerIdentity, request: PipeRequest): AuthDecision {
         if (peer.signingCertSha256.isEmpty()) return AuthDecision.Deny("peer has no readable signing certs")
@@ -13,21 +13,11 @@ class SameSigningKeyAuthorizer(localCertsSha256: Set<String>) : PipeAuthorizer {
 }
 
 /** Allows peers whose signing lineage intersects a fixed cert allowlist. */
-class AllowlistAuthorizer(certSha256: Set<String>) : PipeAuthorizer {
+internal class AllowlistAuthorizer(certSha256: Set<String>) : PipeAuthorizer {
     private val allowed = certSha256.map { it.lowercase() }.toSet()
     override suspend fun authorize(peer: PeerIdentity, request: PipeRequest): AuthDecision {
         if (peer.signingCertSha256.isEmpty()) return AuthDecision.Deny("peer has no readable signing certs")
         return if (peer.signingCertSha256.any { it.lowercase() in allowed }) AuthDecision.Allow
         else AuthDecision.Deny("peer signing certs not in allowlist")
     }
-}
-
-/** Allow if any delegate allows; otherwise Deny with all reasons joined by "; ". */
-fun anyOf(vararg authorizers: PipeAuthorizer): PipeAuthorizer = PipeAuthorizer { peer, request ->
-    val reasons = mutableListOf<String>()
-    for (a in authorizers) when (val d = a.authorize(peer, request)) {
-        is AuthDecision.Allow -> return@PipeAuthorizer AuthDecision.Allow
-        is AuthDecision.Deny -> reasons += d.reason
-    }
-    AuthDecision.Deny(if (reasons.isEmpty()) "no authorizers configured" else reasons.joinToString("; "))
 }

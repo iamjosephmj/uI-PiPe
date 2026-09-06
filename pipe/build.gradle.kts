@@ -2,7 +2,20 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.parcelize)
+    alias(libs.plugins.dokka)
     id("maven-publish")
+}
+
+dokka {
+    dokkaSourceSets {
+        configureEach {
+            // The AIDL wire layer is library-internal plumbing, not integrator API.
+            perPackageOption {
+                matchingRegex.set(".*\\.transport.*")
+                suppress.set(true)
+            }
+        }
+    }
 }
 
 android {
@@ -26,7 +39,7 @@ dependencies {
     // PaneRoot is a Lifecycle/SavedState/ViewModelStore owner so Compose panes work out of the box.
     implementation(libs.lifecycle.viewmodel)
     implementation(libs.savedstate)
-    implementation("androidx.annotation:annotation:1.9.1")
+    implementation(libs.androidx.annotation)
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.robolectric)
@@ -36,7 +49,7 @@ dependencies {
 publishing {
     publications {
         register<MavenPublication>("release") {
-            groupId = "com.github.iamjosephmj.uI-PiPe"; artifactId = "pipe"; version = "1.0.0-alpha02"
+            groupId = "com.github.iamjosephmj.uI-PiPe"; artifactId = "pipe"; version = libs.versions.pipe.get()
             afterEvaluate { from(components["release"]) }
         }
     }

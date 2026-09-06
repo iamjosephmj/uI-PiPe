@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.dokka)
     id("maven-publish")
 }
 
@@ -35,7 +36,7 @@ dependencies {
 publishing {
     publications {
         register<MavenPublication>("release") {
-            groupId = "com.github.iamjosephmj.uI-PiPe"; artifactId = "pipe-serialization"; version = "1.0.0-alpha02"
+            groupId = "com.github.iamjosephmj.uI-PiPe"; artifactId = "pipe-serialization"; version = libs.versions.pipe.get()
             afterEvaluate { from(components["release"]) }
         }
     }

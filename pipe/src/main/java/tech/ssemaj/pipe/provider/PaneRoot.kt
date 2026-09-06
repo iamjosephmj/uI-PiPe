@@ -19,8 +19,8 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 /**
  * Root container of a pane's window. It owns three window-level concerns so the provider's own
  * content doesn't have to:
- *  - **Insets** — pads itself by the system-bar insets, so an edge-to-edge host never pushes pane
- *    content under the status or navigation bars.
+ *  - **Insets** — unless the pane is [PaneSpec.edgeToEdge], pads itself by the system-bar insets,
+ *    so an edge-to-edge host never pushes pane content under the status or navigation bars.
  *  - **Back** — the pane's window is focusable, so it receives the BACK key; [PaneRoot] turns a
  *    BACK press into a provider-side dismissal via [onBack].
  *  - **Compose readiness** — as the window's root view it is a `LifecycleOwner` /
@@ -30,9 +30,14 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
  *    which disposes the composition cleanly.
  *
  * [onBack] is wired by [PipeProviderService] once the pane is live; until then a BACK press is a no-op.
+ *
+ * @param fitSystemBars pad the root by the system-bar insets (the default pane behavior). `false`
+ *   for [PaneSpec.edgeToEdge] panes, which draw under the bars — insets still dispatch to content.
  */
-internal class PaneRoot(context: Context) :
-    FrameLayout(context), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
+internal class PaneRoot(
+    context: Context,
+    fitSystemBars: Boolean = true,
+) : FrameLayout(context), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
 
     /** Invoked on a BACK key-up while this window has focus. Set by the service after the pane opens. */
     var onBack: (() -> Unit)? = null
@@ -52,9 +57,11 @@ internal class PaneRoot(context: Context) :
         setViewTreeViewModelStoreOwner(this)
         setViewTreeSavedStateRegistryOwner(this)
         setOnApplyWindowInsetsListener { v, insets ->
-            val bars = insets.getInsets(WindowInsets.Type.systemBars())
-            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
-            insets
+            if (fitSystemBars) {
+                val bars = insets.getInsets(WindowInsets.Type.systemBars())
+                v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            }
+            insets // never consume — content (e.g. Compose) can still read the insets it needs
         }
     }
 

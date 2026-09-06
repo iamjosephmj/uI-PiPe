@@ -4,7 +4,7 @@ import java.util.concurrent.atomic.AtomicLong
 import tech.ssemaj.pipe.core.PipeMessage
 
 /** Stamps outgoing messages with a monotonically increasing seq. */
-class OutboundSequencer {
+internal class OutboundSequencer {
     private val next = AtomicLong(0)
     fun stamp(message: PipeMessage): PipeMessage = message.withSeq(next.getAndIncrement())
 }
@@ -13,7 +13,7 @@ class OutboundSequencer {
  * Drops duplicate/regressed messages. Oneway binder calls to one node arrive in order,
  * so this is a safety net; gaps are accepted (sender may have skipped seqs).
  */
-class InboundSequencer {
+internal class InboundSequencer {
     private var expected = 0L
 
     @Synchronized

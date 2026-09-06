@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class CoreTypesTest {
-    @Test fun messageDefaultsToUnsetSeqAndSchemaV1() {
+    @Test fun messageSeqDefaultsToUnset() {
         // Bundle is an Android type; on JVM unit tests it is a stub, so only touch defaults here.
         assertEquals(-1L, PipeMessage.UNSET_SEQ)
     }

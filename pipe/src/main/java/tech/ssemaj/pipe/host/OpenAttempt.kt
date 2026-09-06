@@ -20,9 +20,12 @@ import tech.ssemaj.pipe.channel.InboundSequencer
 import tech.ssemaj.pipe.channel.OutboundSequencer
 import tech.ssemaj.pipe.core.CloseReason
 import tech.ssemaj.pipe.core.DenialSource
+import tech.ssemaj.pipe.core.Pipe
 import tech.ssemaj.pipe.core.PipeDeniedException
 import tech.ssemaj.pipe.core.PipeException
 import tech.ssemaj.pipe.core.PipeMessage
+import tech.ssemaj.pipe.core.PipeProviderUnavailableException
+import tech.ssemaj.pipe.core.PipeRequest
 import tech.ssemaj.pipe.core.PipeState
 import tech.ssemaj.pipe.core.PipeTransportException
 import tech.ssemaj.pipe.internal.ignoringRemote
@@ -51,7 +54,7 @@ import tech.ssemaj.pipe.transport.Protocol
 internal class OpenAttempt(
     private val context: Context,
     private val provider: ProviderComponent,
-    private val request: tech.ssemaj.pipe.core.PipeRequest,
+    private val request: PipeRequest,
     private val bindImportance: PipeBindImportance,
     private val hostToken: () -> IBinder?,
     private val mainHandler: Handler,
@@ -100,11 +103,13 @@ internal class OpenAttempt(
     }
 
     fun bind() {
-        val intent = Intent("tech.ssemaj.pipe.action.OPEN_PANE").setComponent(provider.toComponentName())
+        val intent = Intent(Pipe.ACTION_OPEN_PANE).setComponent(provider.toComponentName())
         bound = context.bindService(intent, connection, bindImportance.toBindFlags())
         if (!bound) {
             runCatching { context.unbindService(connection) }
-            terminate(PipeTransportException("bindService returned false"))
+            // The gate passed but the bind still failed — the service is gone, not exported, or
+            // not visible to binds. That is an availability problem, not a transport one.
+            terminate(PipeProviderUnavailableException(PipeProviderUnavailableException.Unavailable.NO_SERVICE))
         }
     }
 

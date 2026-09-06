@@ -51,7 +51,8 @@ Pipe does exactly one thing: a provider draws a **single full-screen pane** over
 :sample-contract       Example @Serializable message contract shared by the two sample apps.
 :sample-host           Demo host: a Compose screen that opens the provider's full-screen certification pane.
 :sample-provider       Demo provider: a consent pane that signs a host nonce with an AndroidKeyStore key.
-:sample-solo           One app, two processes — an Activity opens a pane against its own `:pane`-process service.
+:sample-solo           One app, N processes — an Activity opens panes against its own :pane-process services,
+                       including a three-pane tiling demo (each band independently interactive).
 :evil-host             Adversarial host, signed with a different key — proves the provider gate rejects it.
 :evil-provider         Adversarial provider — proves the host gate rejects it, with no window or bind.
 ```
@@ -67,16 +68,21 @@ Only `:pipe` (and optionally `:pipe-serialization`) ship. The `evil-*` modules e
 ```
 core/         Public value types crossing the boundary and surfaced to callers:
               Pipe (constants), PipeRequest, PipeMessage,
-              PipeState, CloseReason, PipeError, PipeException hierarchy.
-auth/         Identity + authorization: PeerIdentity, SigningSource/AndroidSigningSource,
-              IdentityResolver, PipeAuthorizer, PipeAuthorizers, AuthDecision.
-host/         Host side: PipeFullScreen (public entry), PipeConnection (bind/gate/channel
-              machinery), PipeSession, ProviderComponent, HostGate.
-provider/     Provider side: PipeProviderService, PipeContent, PaneResult, HostHandle, ProviderGate.
-channel/      MessageSequencer (OutboundSequencer / InboundSequencer).
+              PipeState, CloseReason, PipeException hierarchy;
+              internal GateResult + GateWire (shared gate vocabulary and wire markers).
+auth/         Identity + authorization: PeerIdentity, PipeAuthorizer, PipeAuthorizers,
+              AuthDecision; internal PackageManagerSource/AndroidPackageManagerSource
+              and IdentityResolver (the PackageManager seam and identity builder).
+host/         Host side: PipeFullScreen (public entry), PipeSession, ProviderComponent,
+              PipeBindImportance; internal PipeConnection/OpenAttempt (bind/gate/channel
+              machinery), HostGate, gate-failure mapping.
+provider/     Provider side: PipeProviderService, PipeContent, PaneResult, PaneSpec,
+              HostHandle; internal ProviderGate, PaneRoot, PaneWindow, ActivePane.
+channel/      MessageSequencer (internal OutboundSequencer / InboundSequencer).
 discovery/    PipeDiscovery, ProviderDescriptor.
 transport/    AIDL wire: IEmbedProvider, IOpenResultCallback, IEmbedSession, IHostChannel,
               IGuestChannel, OpenSpec; Protocol (version).
+internal/     Cross-cutting internals (ignoringRemote binder-call helper).
 ```
 
 ---
@@ -202,7 +208,7 @@ Built-ins (`PipeAuthorizers`):
 
 - `sameSigningKey(context)` — allow only peers signed with the caller's own key (the default; the closed-family case).
 - `allowlist(vararg certSha256)` — allow specific signing certificates.
-- `anyOf(...)` — compose authorizers.
+- `PipeAuthorizers.anyOf(...)` — compose authorizers.
 
 Because `authorize` is `suspend`, a policy may consult a remote service, a database, or an attestation check before deciding — all without blocking.
 
@@ -295,7 +301,7 @@ A session moves `Connecting → Open → Closed`. `PipeState.Closed(cause)` carr
 
 Teardown is **idempotent** and converges from every trigger — host `close()`, provider `Reject`/`HostHandle.close()`, back-press, activity destroy, open timeout, or peer death (`linkToDeath`). Provider-side, closing a pane calls `WindowManager.removeViewImmediate` on its `PaneRoot` and (unless the host initiated it) notifies the host over `IHostChannel.onClosed`. Host-side, `PipeFullScreen` observes `session.state` and drops its lifecycle observer + back callback when the session closes by *any* path, so nothing leaks.
 
-Errors surface as a small `PipeException` hierarchy (`PipeDeniedException`, `PipeTimeoutException`, `PipeTransportException`, …); `PipeError.Code` enumerates `PROVIDER_NOT_FOUND`, `CERT_UNREADABLE`, `VERSION_MISMATCH`, `TIMEOUT`, `TRANSPORT_FAILURE`.
+Errors surface as a small sealed `PipeException` hierarchy — `PipeDeniedException` (which side's policy refused), `PipeProviderUnavailableException` (`NOT_VISIBLE` / `NO_SERVICE` / `CERT_UNREADABLE` / `NOT_INSTALLED`), `PipeTimeoutException`, `PipeVersionMismatchException`, `PipeTransportException`. Cross-side failures travel as `GateWire` marker strings on `onError(String)` and are re-typed host-side — the markers are produced and parsed only through `GateWire`, so the two sides cannot drift.
 
 ---
 
@@ -345,7 +351,7 @@ Errors surface as a small `PipeException` hierarchy (`PipeDeniedException`, `Pip
 | Public host entry + lifecycle/back wiring | `host/PipeFullScreen.kt` |
 | Provider service, window add, UID-gated callbacks | `provider/PipeProviderService.kt` |
 | Authorization policy | `auth/PipeAuthorizers.kt`, `auth/PipeAuthorizer.kt` |
-| Identity resolution | `auth/AndroidSigningSource.kt`, `auth/IdentityResolver.kt` |
+| Identity resolution | `auth/AndroidPackageManagerSource.kt`, `auth/IdentityResolver.kt` |
 | Wire protocol | `transport/*.aidl`, `transport/OpenSpec.kt` |
 | Channel ordering/dedup | `channel/MessageSequencer.kt` |
 | Typed messaging | `pipe-serialization/…/PipeCodec.kt` |

@@ -11,15 +11,14 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration
-import tech.ssemaj.pipe.auth.AndroidSigningSource
-import tech.ssemaj.pipe.auth.IdentityResolver
+import tech.ssemaj.pipe.auth.AndroidPackageManagerSource
 import tech.ssemaj.pipe.auth.PipeAuthorizer
 import tech.ssemaj.pipe.core.CloseReason
 import tech.ssemaj.pipe.core.DenialSource
+import tech.ssemaj.pipe.core.GateResult
 import tech.ssemaj.pipe.core.PipeDeniedException
 import tech.ssemaj.pipe.core.PipeRequest
 import tech.ssemaj.pipe.core.PipeTimeoutException
-import tech.ssemaj.pipe.provider.GateResult
 
 /**
  * Host-side coordinator for a provider pane. Runs the host gate, then drives one [OpenAttempt] at a
@@ -71,7 +70,7 @@ internal class PipeConnection(
         authorizer: PipeAuthorizer,
         attempt: OpenAttempt,
     ) {
-        val gate = HostGate(IdentityResolver(AndroidSigningSource(context)), authorizer)
+        val gate = HostGate(AndroidPackageManagerSource(context), authorizer)
         when (val result = withContext(Dispatchers.IO) { gate.admit(provider, request) }) {
             is GateResult.Refused -> attempt.terminate(PipeDeniedException(result.reason, DenialSource.HOST_POLICY))
             is GateResult.Failed -> attempt.terminate(result.message.toPipeException())

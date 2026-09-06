@@ -1,7 +1,7 @@
 package tech.ssemaj.pipe.auth
 
 /** Builds verified [PeerIdentity] values from kernel/PackageManager facts. */
-class IdentityResolver(private val source: SigningSource) {
+internal class IdentityResolver(private val source: PackageManagerSource) {
 
     /** Identity for a binder caller uid, or null if it cannot be fully attributed. */
     fun forUid(uid: Int): PeerIdentity? {

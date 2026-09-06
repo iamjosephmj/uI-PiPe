@@ -16,7 +16,9 @@ activityCompose = "1.10.1"
 activity = "1.10.1"
 material = "1.12.0"
 bouncycastle = "1.78.1"
-hydra = "2.3.0"
+annotation = "1.9.1"
+pipe = "1.0.0-alpha03"
+dokka = "2.0.0"
 
 [libraries]
 junit = { module = "junit:junit", version.ref = "junit" }
@@ -34,6 +36,7 @@ compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeB
 compose-material3 = { module = "androidx.compose.material3:material3" }
 compose-ui = { module = "androidx.compose.ui:ui" }
 compose-foundation = { module = "androidx.compose.foundation:foundation" }
+compose-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
 activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 androidx-activity = { module = "androidx.activity:activity", version.ref = "activity" }
 lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version = "2.8.7" }
@@ -41,6 +44,7 @@ lifecycle-viewmodel = { module = "androidx.lifecycle:lifecycle-viewmodel-ktx", v
 savedstate = { module = "androidx.savedstate:savedstate", version = "1.2.1" }
 material-components = { module = "com.google.android.material:material", version.ref = "material" }
 bcpkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bouncycastle" }
+androidx-annotation = { module = "androidx.annotation:annotation", version.ref = "annotation" }
 
 [plugins]
 android-library = { id = "com.android.library", version.ref = "agp" }
@@ -51,4 +55,4 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 binary-compatibility-validator = { id = "org.jetbrains.kotlinx.binary-compatibility-validator", version.ref = "bcv" }
-hydra = { id = "tech.thessemaj.hydra", version.ref = "hydra" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
