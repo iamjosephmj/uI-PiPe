@@ -20,6 +20,16 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
+    buildTypes {
+        // Demo APK: signed with the debug key so the artifact is installable everywhere without
+        // shipping a real keystore; minified+shrunk to keep the download small.
+        release {
+            signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+        }
+    }
 }
 
 dependencies {
