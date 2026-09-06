@@ -60,7 +60,7 @@ class PaneService : PipeProviderService() {
 
 ## Requirements
 
-- `minSdk 30` (Android 11) on both sides; no `@hide` APIs, reflection, or
+- `minSdk 28` (Android 9) on both sides; no `@hide` APIs, reflection, or
   `SurfaceControlViewHost` — public APIs only, so it's Play-policy safe.
 - Kotlin coroutines (the API is coroutine-first).
 - Same library version on both sides of a pane (mismatched versions fail cleanly with

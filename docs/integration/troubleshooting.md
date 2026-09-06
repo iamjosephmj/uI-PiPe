@@ -26,7 +26,8 @@ Every failure is a sealed `PipeException` (delivered to `PipeFullScreen.open`'s 
 ## `NOT_VISIBLE` — provider invisible
 
 Android 11+ package visibility: your app cannot see packages it hasn't declared, and "invisible"
-and "not installed" look identical from your process. The fix is one manifest declaration, *before*
+and "not installed" look identical from your process. (On Android 9/10 there is no visibility
+filtering — this failure mode doesn't exist there.) The fix is one manifest declaration, *before*
 `<application>`:
 
 ```xml

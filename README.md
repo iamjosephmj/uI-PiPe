@@ -4,7 +4,7 @@
   <a href="https://jitpack.io/#iamjosephmj/uI-PiPe"><img src="https://jitpack.io/v/iamjosephmj/uI-PiPe.svg" alt="JitPack"></a>
   <a href="https://github.com/iamjosephmj/uI-PiPe/actions/workflows/ci.yml"><img src="https://github.com/iamjosephmj/uI-PiPe/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"></a>
-  <img src="https://img.shields.io/badge/minSdk-30-3CB043" alt="minSdk 30">
+  <img src="https://img.shields.io/badge/minSdk-28-3CB043" alt="minSdk 28">
   <img src="https://img.shields.io/badge/Kotlin-Android-5C94FC" alt="Kotlin Android">
 </p>
 
@@ -21,7 +21,7 @@ App&nbsp;A (the *host*) hands its window to App&nbsp;B (the *provider*), and App
 
 Under the hood, App&nbsp;A's activity hands its **window token** to App&nbsp;B, which adds its `View` as a **real full-screen window** inside App&nbsp;A's own window hierarchy — plus a two-way typed channel between them. App&nbsp;A's jank never stalls it, an App&nbsp;B crash can't take down App&nbsp;A, and neither app's code runs in the other. And because it's a genuine window — not a screenshot, a WebView, or a `RemoteViews` — it's a first-class focus / **soft-keyboard (IME)** / input target on every supported API, with no `SurfaceControlViewHost` and no `@hide` APIs.
 
-**Status:** latest release (`1.0.0-alpha03`). Android 11+ (`minSdk 30`). Targets a closed app family / vetted partners, not an open marketplace. Deep dive: **[ARCHITECTURE.md](ARCHITECTURE.md)**.
+**Status:** latest release (`1.0.0-alpha03`). Android 9+ (`minSdk 28`). Targets a closed app family / vetted partners, not an open marketplace. Deep dive: **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 ## See it in action
 
@@ -174,11 +174,11 @@ Independent per-direction streams. Delivery is **ordered** and **de-duplicated**
 ./gradlew :sample-host:connectedDebugAndroidTest :evil-host:connectedDebugAndroidTest
 ```
 
-`sample-host` covers render, input into the pane (including IME), both-direction channels, the full attestation round-trip, and teardown. The `evil-*` apps (signed with a different key) assert both directions of denial. The full suite is verified green end-to-end on **API 30 (emulator)** and a **physical Pixel 6 Pro (API 36)** — the two ends of the supported range.
+`sample-host` covers render, input into the pane (including IME), both-direction channels, the full attestation round-trip, and teardown. The `evil-*` apps (signed with a different key) assert both directions of denial. The full suite is verified green end-to-end on **API 28 (emulator)**, **API 30 (emulator)**, and a **physical Pixel 6 Pro (API 36)** — the two ends of the supported range plus the middle.
 
 ## Known limitations
 
-- **`minSdk 30`** (Android 11) — the floor for the cross-process sub-window and the auth stack. **Public APIs only, no `@hide`/reflection** (Play-safe). Full interaction and native IME work across the whole range; verified end-to-end on API 30 and API 36.
+- **`minSdk 28`** (Android 9 Pie) — the pane mechanism (cross-process sub-windows + the signing-auth stack) runs on public APIs all the way down; insets handling branches at API 30. **Public APIs only, no `@hide`/reflection** (Play-safe). Full interaction and native IME work across the whole range; verified end-to-end on API 28 (emulator), API 30, and API 36.
 - **Provider owns the window over the host** — full-screen and transparent by default, so a pane can be see-through (dialogs/sheets show host content behind them) while still consuming input over its bounds. That's a larger surface than an embedded pane; dismissing the *visible* window is provider-cooperative (BACK/lifecycle/`session.close()` all tear it down; the host fully controls the binding either way). The identity gate is what makes handing over the window token safe — see [Trust & authorization](#trust--authorization).
 - **One pane, full-screen** — Pipe does exactly one thing: a single full-screen pane. No embedded/resizable/multi-pane surfaces (an earlier `SurfaceControlViewHost` build did; it was cut so IME and input work identically on every API, with no `@hide`).
 - **Coarse-grained** — every message is a binder transaction; great for a pane + occasional messages, not high-frequency loops.

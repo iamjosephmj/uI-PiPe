@@ -41,6 +41,10 @@ This is the single most common integration failure (`NOT_VISIBLE`; see
 [troubleshooting](troubleshooting.md#not_visible--provider-invisible)). Declare the provider
 **by package** (tightest, recommended):
 
+> On Android 9/10 (API 28–29) package visibility filtering doesn't exist — every installed package
+> is visible — so the declaration is inert there (the platform simply ignores it). Keep it
+> unconditionally; it costs nothing and future-proofs the install base.
+
 ```xml
 <manifest …>
     <queries>

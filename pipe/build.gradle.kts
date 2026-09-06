@@ -21,7 +21,7 @@ dokka {
 android {
     namespace = "tech.ssemaj.pipe"
     compileSdk = 36
-    defaultConfig { minSdk = 30 }
+    defaultConfig { minSdk = 28 }
     buildFeatures { aidl = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

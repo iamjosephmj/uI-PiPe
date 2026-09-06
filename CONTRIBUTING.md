@@ -14,7 +14,8 @@ By contributing, you agree that your contributions are licensed under the projec
 
 - **JDK 17** (CI uses Temurin 17; 17+ works locally).
 - **Android SDK** with the platform for `compileSdk` (currently 36). `minSdk` is **30**.
-- A device or emulator on **API 30+** for the instrumented tests.
+- A device or emulator on **API 28+** for the instrumented tests. The supported range is 28–36;
+  the suite is verified on an API 28 emulator, an API 30 emulator, and a Pixel 6 Pro (API 36).
 
 Everything runs through the Gradle wrapper (`./gradlew`) — no local Gradle needed.
 

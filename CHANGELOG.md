@@ -6,6 +6,15 @@ versioning: [SemVer](https://semver.org/) — pre-1.0, so breaking changes are p
 
 ## [Unreleased]
 
+### Changed
+
+- **`minSdk` lowered from 30 (Android 11) to 28 (Android 9/Pie).** The cross-process sub-window
+  mechanism and the signing-auth stack run on public APIs available since API 28; the only API-30
+  dependency (`WindowInsets.Type`) is branched in the pane root and the host's system-bar dim.
+  Verified end-to-end on an API 28 emulator — the full instrumented certification suite (render,
+  input into the pane, both-direction messaging, teardown, adversarial denials) plus the solo
+  tiling demo — alongside the existing API 30 and API 36 verifications.
+
 ## [1.0.0-alpha03] — 2026-09-06
 
 Focused on making the library ready for real integrators: the public API is now exactly the

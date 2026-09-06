@@ -1,6 +1,7 @@
 package tech.ssemaj.pipe.provider
 
 import android.content.Context
+import android.os.Build
 import android.view.KeyEvent
 import android.view.WindowInsets
 import android.widget.FrameLayout
@@ -58,8 +59,18 @@ internal class PaneRoot(
         setViewTreeSavedStateRegistryOwner(this)
         setOnApplyWindowInsetsListener { v, insets ->
             if (fitSystemBars) {
-                val bars = insets.getInsets(WindowInsets.Type.systemBars())
-                v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    val bars = insets.getInsets(WindowInsets.Type.systemBars())
+                    v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+                } else {
+                    @Suppress("DEPRECATION")
+                    v.setPadding(
+                        insets.systemWindowInsetLeft,
+                        insets.systemWindowInsetTop,
+                        insets.systemWindowInsetRight,
+                        insets.systemWindowInsetBottom,
+                    )
+                }
             }
             insets // never consume — content (e.g. Compose) can still read the insets it needs
         }

@@ -29,7 +29,7 @@ These are documented trade-offs, not vulnerabilities (see [ARCHITECTURE.md §12]
 - The provider owns a **full-screen (transparent by default) window over the host** — a larger on-screen surface than an embedded pane. This is made safe by verifying the provider's signing identity before the window token is handed over; it is intended for a **closed app family / vetted partners**, not an open marketplace of arbitrary providers.
 - A **legitimately verified** provider behaving badly within its own pane (the trust anchor is signing identity — same key or an allowlist — not runtime sandboxing of provider code).
 - OEM- or ROM-specific window-policy differences (worth reporting as compatibility issues, but not treated as vulnerabilities in the core model).
-- Devices below API 30, where the mechanism does not exist (open fails with a clean `PipeTransportException`).
+- Devices below API 28, the declared minimum.
 
 ## Supported versions
 

@@ -113,7 +113,7 @@ pinning). The library verifies *who*; attestation verifies *what hardware they h
   or the host unbinds (BACK/lifecycle/`session.close()` all work host-side regardless).
 - OEM-specific window/LMK policies are outside the library's control (see
   [troubleshooting](troubleshooting.md#faq--gotchas)); behavior is verified on stock Android
-  API 30–36.
+  API 28–36.
 - `PERMISSION`-based binding was cut from the protocol in favor of the two-gate model; don't add
   custom signature-permissions to the service expecting the library to enforce them — put that
   logic in your authorizers.

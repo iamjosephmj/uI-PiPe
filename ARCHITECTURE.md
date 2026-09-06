@@ -291,7 +291,7 @@ Because the params carry the host's window token, the panel becomes a child wind
 
 The host side never touches a `Surface`. `PipeConnection` binds the service, runs the host gate, waits for the host activity's window token to be available (`decorView.windowToken`, i.e. the decor view attached), sends the `OpenSpec`, and wires the two channels into the `PipeSession`. `PipeFullScreen.open(...)` layers lifecycle + back-press wiring on top and returns a `Job`.
 
-`minSdk 30` is the floor because the parenting behavior and the `WindowInsets.Type` API this relies on are API 30; below it, there is no supported path (open fails with a clean `PipeTransportException`, not a crash).
+`minSdk 28` (Android 9). The cross-process sub-window mechanism — a `TYPE_APPLICATION_PANEL` window parented to the host's token — and the signing-auth stack run on public APIs available since API 28; the only API 30 dependency was `WindowInsets.Type`, which the pane root and the host's bar-dim branch around (`systemWindowInset*` below R, `getInsets(Type)` on R+). Verified end-to-end on an API 28 emulator, an API 30 emulator, and an API 36 device.
 
 ---
 
@@ -327,13 +327,13 @@ Errors surface as a small sealed `PipeException` hierarchy — `PipeDeniedExcept
 
 - Open, unvetted provider ecosystems. The trust anchor is signing identity (same key or an allowlist); there is no runtime sandbox around arbitrary provider code beyond process isolation.
 - Protecting a provider from a host that legitimately opens it (the host owns the token the provider's window is parented to).
-- Devices below API 30 — the parenting/inset APIs do not exist, so there is no supported cross-process pane; open fails with a `PipeTransportException`.
+- Devices below API 28 — the declared minimum; not a supported target.
 
 ---
 
 ## 13. Known limitations & non-goals
 
-- **`minSdk = 30` (Android 11) — the floor.** The cross-process sub-window (parenting a panel to the host's window token) and the `WindowInsets.Type` API are API 30. **Everything uses public APIs — no `@hide`/reflection** (so it is Play-safe). Full interaction and native IME work across the whole range. Verified working end-to-end (full certification round-trip incl. input into the pane and native IME) on API 30 (emulator) and API 36 (physical Pixel 6 Pro), with the whole instrumented suite green on both.
+- **`minSdk = 28` (Android 9) — the floor.** The cross-process sub-window (parenting a panel to the host's window token) and the signing-auth stack run on public APIs since API 28; insets branch around the API-30 `WindowInsets.Type`. **Everything uses public APIs — no `@hide`/reflection** (so it is Play-safe). Full interaction and native IME work across the whole range. Verified working end-to-end (full certification round-trip incl. input into the pane and native IME) on API 28 (emulator), API 30 (emulator), and API 36 (physical Pixel 6 Pro), with the whole instrumented suite green on all three.
 - **One full-screen pane.** No embedded, resizable, or multi-instance panes — that was the SCVH design, cut for the reasons in §1. If you need a small in-layout surface, Pipe is not it.
 - **Provider owns the visible window.** The host controls the binding/session but relies on the provider (or BACK/lifecycle) to remove the *view*; see §12.
 - **IPC granularity** — every message is a binder transaction; Pipe suits coarse-grained handoffs, not high-frequency small-message loops.

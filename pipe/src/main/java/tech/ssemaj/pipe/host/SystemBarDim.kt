@@ -3,6 +3,7 @@ package tech.ssemaj.pipe.host
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.app.Activity
+import android.os.Build
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
@@ -26,8 +27,15 @@ internal class SystemBarDim(private val activity: Activity) {
     fun attach() {
         if (strips != null) return
         val insets = decor.rootWindowInsets ?: return
-        val topInset = insets.getInsets(WindowInsets.Type.statusBars()).top
-        val bottomInset = insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+        val topInset: Int
+        val bottomInset: Int
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            topInset = insets.getInsets(WindowInsets.Type.statusBars()).top
+            bottomInset = insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+        } else {
+            @Suppress("DEPRECATION") topInset = insets.systemWindowInsetTop
+            @Suppress("DEPRECATION") bottomInset = insets.systemWindowInsetBottom
+        }
         if (topInset <= 0 && bottomInset <= 0) return
 
         val added = mutableListOf<View>()
